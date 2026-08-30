@@ -125,6 +125,59 @@ export function shoveStatus(basePos, key) {
   return (SHOVE10[basePos] || SHOVE10.BTN).has(key) ? 'shove' : 'fold';
 }
 
+// ---------- vs-open (3-bet) & BB-defend ranges (100 BB) ----------
+
+const OPENER_EARLY = S('UTG', 'UTG1', 'LJ', 'HJ');
+export function openerTier(pos) {
+  return OPENER_EARLY.has(pos) ? 'early' : 'late';
+}
+
+// hero responding IN POSITION (BTN / CO) to an open
+const VSOPEN_IP = {
+  early: {
+    value: S('QQ', 'KK', 'AA', 'AKs', 'AKo', 'AQs'),
+    bluff: S('A5s', 'A4s', 'A3s', 'KJs'),
+    call: S('JJ', 'TT', '99', '88', '77', 'AJs', 'ATs', 'A9s', 'KQs', 'KTs', 'QJs', 'QTs', 'JTs', 'T9s', '98s', '87s', '76s', 'AQo'),
+  },
+  late: {
+    value: S('TT', 'JJ', 'QQ', 'KK', 'AA', 'AKs', 'AKo', 'AQs', 'AQo', 'AJs'),
+    bluff: S('A5s', 'A4s', 'A3s', 'A2s', 'K9s', 'K8s', 'K7s', 'K6s', 'K5s', 'Q9s', 'J9s', 'T8s', '97s', '86s', '65s', '54s'),
+    call: S('99', '88', '77', '66', '55', '44', '33', '22', 'ATs', 'A9s', 'KQs', 'KJs', 'KTs', 'QJs', 'QTs', 'JTs', 'T9s', '98s', '87s', '76s', 'KQo', 'AJo', 'ATo', 'KJo', 'QJo'),
+  },
+};
+
+// BB defending an open (getting a price → very wide calls)
+const BB_DEFEND = {
+  early: {
+    value: S('QQ', 'KK', 'AA', 'AKs', 'AKo', 'AQs'),
+    bluff: S('A5s', 'A4s', 'K5s', 'K4s', '76s', '65s'),
+    call: S('22', '33', '44', '55', '66', '77', '88', '99', 'JJ', 'TT', 'ATs', 'A9s', 'A8s', 'A7s', 'A6s', 'A3s', 'A2s', 'KQs', 'KJs', 'KTs', 'K9s', 'K8s', 'K7s', 'K6s', 'QJs', 'QTs', 'Q9s', 'Q8s', 'JTs', 'J9s', 'J8s', 'T9s', 'T8s', '98s', '97s', '87s', '86s', '75s', '64s', '54s', 'AJo', 'ATo', 'A9o', 'KQo', 'KJo', 'KTo', 'QJo', 'QTo', 'JTo'),
+  },
+  late: {
+    value: S('TT', 'JJ', 'QQ', 'KK', 'AA', 'AKs', 'AKo', 'AQs', 'AQo'),
+    bluff: S('A5s', 'A4s', 'A3s', 'A2s', 'K7s', 'K6s', 'K5s', 'K4s', 'K3s', 'K2s', '96s', '85s', '74s', '53s', 'J8s', 'T7s'),
+    call: S('22', '33', '44', '55', '66', '77', '88', '99', 'ATs', 'A9s', 'A8s', 'A7s', 'A6s', 'KQs', 'KJs', 'KTs', 'K9s', 'K8s', 'QJs', 'QTs', 'Q9s', 'Q8s', 'Q7s', 'Q6s', 'Q5s', 'JTs', 'J9s', 'J7s', 'J6s', 'T9s', 'T8s', 'T6s', 'T5s', '98s', '97s', '96s', '95s', '87s', '86s', '84s', '76s', '75s', '74s', '65s', '64s', '63s', '54s', '53s', '43s', '32s', 'Q4s', 'Q3s', 'Q2s', 'J5s', 'J4s', 'T4s', '94s', '93s', 'AJo', 'ATo', 'A9o', 'A8o', 'A7o', 'A6o', 'A5o', 'A4o', 'A3o', 'A2o', 'KQo', 'KJo', 'KTo', 'K9o', 'K8o', 'K7o', 'K6o', 'K5o', 'QJo', 'QTo', 'Q9o', 'Q8o', 'Q7o', 'JTo', 'J9o', 'J8o', 'J7o', 'T9o', 'T8o', 'T7o', '98o', '97o', '96o', '87o', '86o', '76o', '75o', '65o', '64o', '54o'),
+  },
+};
+
+/**
+ * mode: 'rfi' | 'vsopen' | 'defend'
+ * returns 'raise' | 'mix' | 'call' | 'fold'
+ */
+export function rangeStatus(mode, heroPos, vsPos, key) {
+  if (mode === 'rfi') {
+    const st = rfiStatus(heroPos, key, 100);
+    return st === 'open' ? 'raise' : st; // 'mix' | 'fold'
+  }
+  const tier = openerTier(vsPos);
+  const inBlind = mode === 'defend' || heroPos === 'BB' || heroPos === 'SB';
+  const tbl = inBlind ? BB_DEFEND[tier] : VSOPEN_IP[tier];
+  if (tbl.value.has(key)) return 'raise';
+  if (tbl.bluff.has(key)) return 'mix';
+  if (tbl.call.has(key)) return 'call';
+  return 'fold';
+}
+
 // ---------- action advisor ----------
 
 function openSize(stackBB, pos) {
@@ -353,50 +406,98 @@ export function bestHand(cards) {
   return best;
 }
 
-export function inRange(c1, c2, range) {
+/** hand key ('AKs' | 'AKo' | 'AA') from two card indices. */
+export function comboKey(c1, c2) {
+  const hi = Math.max(c1 >> 2, c2 >> 2);
+  const lo = Math.min(c1 >> 2, c2 >> 2);
+  const hc = RANKS[12 - hi];
+  const lc = RANKS[12 - lo];
+  if (hi === lo) return hc + lc;
+  return hc + lc + ((c1 & 3) === (c2 & 3) ? 's' : 'o');
+}
+
+function matchRange(c1, c2, spec) {
+  if (!spec || spec === 'random' || spec === 'ANY') return true;
+  if (spec instanceof Set) return spec.has(comboKey(c1, c2));
+  // string presets
   const r1 = Math.max(c1 >> 2, c2 >> 2);
   const r2 = Math.min(c1 >> 2, c2 >> 2);
   const suited = (c1 & 3) === (c2 & 3);
   const pair = r1 === r2;
-  if (range === 'premium') return (pair && r1 >= 9) || (r1 === 12 && r2 === 11);
-  if (range === 'strong') return (pair && r1 >= 7) || (r1 === 12 && r2 >= 8 && suited) || (r1 === 12 && r2 >= 10) || (r1 === 11 && r2 === 10 && suited);
-  if (range === 'wide') return pair || (r1 >= 8 && r2 >= 8) || (suited && r1 - r2 <= 1 && r1 >= 3) || (suited && r1 >= 9);
+  if (spec === 'premium') return (pair && r1 >= 9) || (r1 === 12 && r2 === 11);
+  if (spec === 'strong') return (pair && r1 >= 7) || (r1 === 12 && r2 >= 8 && suited) || (r1 === 12 && r2 >= 10) || (r1 === 11 && r2 === 10 && suited);
+  if (spec === 'wide') return pair || (r1 >= 8 && r2 >= 8) || (suited && r1 - r2 <= 1 && r1 >= 3) || (suited && r1 >= 9);
   return true;
 }
 
-/** returns { hero, villain, tie } as fixed(1) strings, or null. */
-export function runMC(heroCards, boardCards, rangeName, iters = 1500) {
-  const used = new Set([...heroCards, ...boardCards]);
+export function inRange(c1, c2, range) {
+  return matchRange(c1, c2, range);
+}
+
+/**
+ * Monte-Carlo equity.
+ *   heroCards  — [c1,c2] for a fixed hand, or null when opts.hero is a range
+ *   opts       — string villain preset (back-compat), or:
+ *                { hero, villain, villainHand }
+ *                hero/villain: 'random' | preset string | Set of hand keys
+ *                villainHand: [c1,c2] to pin the villain to one hand
+ * Returns { hero, villain, tie } as fixed(1) strings, or null.
+ */
+export function runMC(heroCards, boardCards, opts, iters = 1500) {
+  const o = typeof opts === 'string' ? { villain: opts } : opts || {};
+  const heroRange = o.hero;
+  const fixedHero = !heroRange && Array.isArray(heroCards) && heroCards.length === 2;
+  const villainHand = o.villainHand && o.villainHand.length === 2 ? o.villainHand : null;
+
+  const used = new Set([
+    ...(fixedHero ? heroCards : []),
+    ...(villainHand || []),
+    ...boardCards,
+  ]);
   const deck = [];
   for (let c = 0; c < 52; c++) if (!used.has(c)) deck.push(c);
+  const boardNeed = 5 - boardCards.length;
+
   let heroW = 0, tie = 0, total = 0;
   for (let iter = 0; iter < iters; iter++) {
     for (let j = deck.length - 1; j > 0; j--) {
       const k = (Math.random() * (j + 1)) | 0;
       [deck[j], deck[k]] = [deck[k], deck[j]];
     }
-    let v0 = -1, v1 = -1;
-    if (rangeName === 'random') { v0 = deck[0]; v1 = deck[1]; }
-    else {
-      outer: for (let a = 0; a < deck.length - 1; a++) {
+    const con = new Set();
+    const takeRange = (spec) => {
+      for (let a = 0; a < deck.length - 1; a++) {
+        if (con.has(deck[a])) continue;
         for (let b = a + 1; b < deck.length; b++) {
-          if (inRange(deck[a], deck[b], rangeName)) {
-            v0 = deck[a]; v1 = deck[b];
-            [deck[a], deck[0]] = [deck[0], deck[a]];
-            [deck[b], deck[1]] = [deck[1], deck[b]];
-            break outer;
+          if (con.has(deck[b])) continue;
+          if (matchRange(deck[a], deck[b], spec)) {
+            con.add(deck[a]);
+            con.add(deck[b]);
+            return [deck[a], deck[b]];
           }
         }
       }
-    }
-    if (v0 < 0) continue;
-    const need = 5 - boardCards.length;
-    const extra = deck.slice(2, 2 + need);
-    if (extra.length < need) continue;
+      return null;
+    };
+    const takeN = (n) => {
+      const r = [];
+      for (const c of deck) {
+        if (con.has(c)) continue;
+        r.push(c);
+        con.add(c);
+        if (r.length === n) break;
+      }
+      return r;
+    };
+
+    const hero = fixedHero ? heroCards : takeRange(heroRange || 'random');
+    if (!hero) continue;
+    const villain = villainHand || takeRange(o.villain || 'random');
+    if (!villain) continue;
+    const extra = takeN(boardNeed);
+    if (extra.length < boardNeed) continue;
     const board = [...boardCards, ...extra];
-    const hs = bestHand([...heroCards, ...board]);
-    const vs = bestHand([v0, v1, ...board]);
-    const cmp = cmpH(hs, vs);
+    const cmp = cmpH(bestHand([...hero, ...board]), bestHand([...villain, ...board]));
     total++;
     if (cmp > 0) heroW++;
     else if (cmp === 0) tie++;

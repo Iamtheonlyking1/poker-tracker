@@ -4,6 +4,9 @@ import {
   normalizeHandKey,
   rfiStatus,
   shoveStatus,
+  rangeStatus,
+  openerTier,
+  comboKey,
   decideAction,
   potOddsPct,
   equityFromOuts,
@@ -104,4 +107,41 @@ test('runMC — dominated hand loses', () => {
   const r = runMC([cardIndex('7', 's'), cardIndex('2', 'h')], [], 'premium', 2000);
   assert.ok(r);
   assert.ok(parseFloat(r.hero) < 40);
+});
+
+test('comboKey', () => {
+  assert.equal(comboKey(cardIndex('A', 's'), cardIndex('K', 's')), 'AKs');
+  assert.equal(comboKey(cardIndex('K', 's'), cardIndex('A', 'h')), 'AKo');
+  assert.equal(comboKey(cardIndex('A', 's'), cardIndex('A', 'h')), 'AA');
+});
+
+test('rangeStatus — rfi / vs open / defend', () => {
+  assert.equal(openerTier('UTG'), 'early');
+  assert.equal(openerTier('BTN'), 'late');
+  // rfi maps open->raise
+  assert.equal(rangeStatus('rfi', 'BTN', null, 'AA'), 'raise');
+  assert.equal(rangeStatus('rfi', 'UTG', null, '72o'), 'fold');
+  // vs open, IP: AA raises, 72o folds, JTs calls vs a late open
+  assert.equal(rangeStatus('vsopen', 'BTN', 'CO', 'AA'), 'raise');
+  assert.equal(rangeStatus('vsopen', 'BTN', 'CO', '72o'), 'fold');
+  assert.equal(rangeStatus('vsopen', 'BTN', 'CO', 'JTs'), 'call');
+  // BB defends much wider vs a BTN open than vs UTG
+  const wideVsBtn = CANONICAL.filter((k) => rangeStatus('defend', 'BB', 'BTN', k) !== 'fold').length;
+  const wideVsUtg = CANONICAL.filter((k) => rangeStatus('defend', 'BB', 'UTG', k) !== 'fold').length;
+  assert.ok(wideVsBtn > wideVsUtg);
+});
+
+test('runMC — hand vs hand and range vs hand', () => {
+  const AA = [cardIndex('A', 's'), cardIndex('A', 'h')];
+  const KK = [cardIndex('K', 's'), cardIndex('K', 'h')];
+  const r = runMC(AA, [], { villainHand: KK }, 4000);
+  assert.ok(r);
+  assert.ok(parseFloat(r.hero) > 78 && parseFloat(r.hero) < 86, `AA vs KK ${r.hero}`);
+  // hero as a range: 'premium' vs a random hand should be a big favourite
+  const r2 = runMC(null, [], { hero: 'premium', villain: 'random' }, 3000);
+  assert.ok(parseFloat(r2.hero) > 60);
+  // custom Set as villain range
+  const set = new Set(['AA', 'KK', 'QQ']);
+  const r3 = runMC([cardIndex('A', 'c'), cardIndex('K', 'c')], [], { villain: set }, 3000);
+  assert.ok(r3 && parseFloat(r3.hero) < 45); // AKs vs QQ+ is behind
 });

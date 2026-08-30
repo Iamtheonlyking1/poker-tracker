@@ -1318,6 +1318,14 @@ label.check input {
   color: #bff3d3;
   font-weight: 600;
 }
+.rg-call {
+  background: rgba(99, 179, 255, 0.28);
+  color: #cfe6ff;
+  font-weight: 600;
+}
+.range-grid.editable td.rg {
+  cursor: pointer;
+}
 .legend {
   display: flex;
   justify-content: center;
@@ -1342,6 +1350,9 @@ label.check input {
 }
 .sw-mix {
   background: rgba(76, 224, 138, 0.5);
+}
+.sw-call {
+  background: rgba(99, 179, 255, 0.55);
 }
 .sw-fold {
   background: rgba(255, 255, 255, 0.12);

@@ -15,9 +15,11 @@ export const STORE_KEYS = [
   'poker.sessionlog',
   'poker.quiz',
   'poker.structures',
+  'poker.customRanges',
 ];
 
 const STRUCTURES_KEY = 'poker.structures';
+const CUSTOMRANGES_KEY = 'poker.customRanges';
 
 let undoStack = [];
 
@@ -87,6 +89,26 @@ export function saveStructure(name, levels) {
 export function deleteStructure(id) {
   const list = loadStructures().filter((x) => x.id !== id);
   writeJSON(STRUCTURES_KEY, list);
+  return list;
+}
+
+// ---- saved custom ranges (list of hand keys) ----
+
+export function loadCustomRanges() {
+  return readJSON(CUSTOMRANGES_KEY, []);
+}
+
+export function saveCustomRange(name, hands) {
+  const list = loadCustomRanges().filter((x) => x.name !== name);
+  list.push({ id: uid(), name, hands: [...hands] });
+  list.sort((a, b) => a.name.localeCompare(b.name));
+  writeJSON(CUSTOMRANGES_KEY, list);
+  return list;
+}
+
+export function deleteCustomRange(id) {
+  const list = loadCustomRanges().filter((x) => x.id !== id);
+  writeJSON(CUSTOMRANGES_KEY, list);
   return list;
 }
 

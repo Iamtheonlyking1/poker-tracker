@@ -72,11 +72,15 @@ you can peek mid-game (the game autosaves). `toolkit.html` now just redirects
 here.
 
 - **BB Calc** — stack ÷ big blind, plus a stack-depth guide
-- **Ranges** — 13×13 preflop opening grid by table size, position, stack depth
+- **Ranges** — 13×13 grid with four modes: RFI (by table size, position, stack
+  depth), Vs open (3-bet / call / fold vs an early or late opener), BB defend,
+  and Build — tap cells to make a custom range, name it, save it, reuse it
 - **Action** — rules-based preflop advisor (RFI / vs open / vs 3-bet)
 - **Odds & SPR** — pot odds, equity (rule of 2/4), EV, outs table, SPR
 - **Range Quiz** — flashcards, score saved locally
-- **Equity** — Monte-Carlo hand-vs-range equity (1,500 sims, in-browser)
+- **Equity** — in-browser Monte-Carlo equity; hero and villain can each be a
+  specific hand or a range (preset or a saved custom range), with the matchup
+  labelled
 - **ICM / Chop** — fair split of a prize pool by chip stacks (Malmuth–Harville),
   standalone or "Load" from a running tournament
 - **Study** — bet sizing, blockers, MDF/alpha and other concepts

@@ -16,6 +16,9 @@ import {
   loadRoster,
   upsertRosterPlayer,
   deleteRosterPlayer,
+  loadCustomRanges,
+  saveCustomRange,
+  deleteCustomRange,
 } from './state.js';
 import { sessionNets, icmEquities, payouts as tPayouts, prizePool as tPrizePool } from './tournament.js';
 import { exportBlob, importAll, summarize, markExported } from './backup.js';
@@ -215,65 +218,146 @@ export function viewBBCalc() {
 
 // ---------- Ranges ----------
 
-export function viewRanges() {
-  const players = sel(['2', '3', '4', '5', '6', '7', '8', '9'], { 'aria-label': 'Players' });
-  players.value = '8';
-  const pos = sel([], { 'aria-label': 'Position' });
-  const depth = sel([['20', '20 BB'], ['40', '40 BB'], ['60', '60 BB'], ['100', '100 BB']], { 'aria-label': 'Stack depth' });
-  depth.value = '40';
-  const grid = h('div', { class: 'scroll-x' });
+const RG_CLASS = { raise: 'rg-open', mix: 'rg-mix', call: 'rg-call', in: 'rg-open', fold: 'rg-fold' };
+const legend = (items) =>
+  h('div', { class: 'legend' }, ...items.map(([c, l]) => h('span', {}, h('i', { class: 'sw sw-' + c }), l)));
 
-  const fillPos = () => {
-    const p = parseInt(players.value, 10);
-    const list = poker.positionsByPlayers[p] || poker.positionsByPlayers[8];
-    pos.replaceChildren(...list.map((x) => h('option', { value: x }, x)));
-    pos.value = list[0];
-  };
-  const render = () => {
-    const p = parseInt(players.value, 10);
-    const d = parseInt(depth.value, 10);
-    let base = poker.mapToBase8(p, pos.value).replace('UTG+1', 'UTG1').replace('UTG+2', 'UTG2');
-    if (base === 'UTG2') base = 'LJ';
-    const table = h('table', { class: 'range-grid' });
-    const hr = h('tr', {}, h('th', {}));
-    poker.RANKS.forEach((r) => hr.append(h('th', {}, r)));
-    table.append(hr);
-    for (let i = 0; i < 13; i++) {
-      const tr = h('tr', {}, h('th', {}, poker.RANKS[i]));
-      for (let j = 0; j < 13; j++) {
-        const k = poker.handKey(i, j);
-        const st = poker.rfiStatus(base, k, d);
-        tr.append(h('td', { class: 'rg ' + (st === 'open' ? 'rg-open' : st === 'mix' ? 'rg-mix' : 'rg-fold') }, k.length === 2 ? k : k.slice(0, 3)));
-      }
-      table.append(tr);
+function paintRangeGrid(gridEl, statusFn, onCell) {
+  const table = h('table', { class: 'range-grid' + (onCell ? ' editable' : '') });
+  const hr = h('tr', {}, h('th', {}));
+  poker.RANKS.forEach((r) => hr.append(h('th', {}, r)));
+  table.append(hr);
+  for (let i = 0; i < 13; i++) {
+    const tr = h('tr', {}, h('th', {}, poker.RANKS[i]));
+    for (let j = 0; j < 13; j++) {
+      const k = poker.handKey(i, j);
+      const td = h('td', { class: 'rg ' + (RG_CLASS[statusFn(k)] || 'rg-fold') }, k.length === 2 ? k : k.slice(0, 3));
+      if (onCell) td.addEventListener('click', () => onCell(k, td));
+      tr.append(td);
     }
-    grid.replaceChildren(table);
-  };
-  fillPos();
-  render();
-  players.addEventListener('change', () => { fillPos(); render(); });
-  pos.addEventListener('change', render);
-  depth.addEventListener('change', render);
+    table.append(tr);
+  }
+  gridEl.replaceChildren(table);
+}
 
-  return [
-    toolHead('Ranges'),
-    h('div', { class: 'card' },
-      h('h2', {}, 'Opening ranges'),
+export function viewRanges() {
+  const mode = nav.state.rangesMode || (nav.state.rangesMode = 'rfi');
+  const setMode = (m) => { nav.state.rangesMode = m; nav.render(); };
+  const modeBar = h('div', { class: 'inner-tabs' },
+    ...[['rfi', 'Open'], ['vsopen', 'Vs open'], ['defend', 'BB defend'], ['build', 'Build']].map(([m, l]) =>
+      h('button', { class: 'inner-tab' + (m === mode ? ' on' : ''), onclick: () => setMode(m) }, l)));
+
+  const grid = h('div', { class: 'scroll-x' });
+  let card;
+
+  if (mode === 'rfi') {
+    const players = sel(['2', '3', '4', '5', '6', '7', '8', '9'], { 'aria-label': 'Players' });
+    players.value = '8';
+    const pos = sel([], { 'aria-label': 'Position' });
+    const depth = sel([['20', '20 BB'], ['40', '40 BB'], ['60', '60 BB'], ['100', '100 BB']], { 'aria-label': 'Depth' });
+    depth.value = '40';
+    const fillPos = () => {
+      const list = poker.positionsByPlayers[parseInt(players.value, 10)] || poker.positionsByPlayers[8];
+      pos.replaceChildren(...list.map((x) => h('option', { value: x }, x)));
+      pos.value = list[0];
+    };
+    const draw = () => {
+      let base = poker.mapToBase8(parseInt(players.value, 10), pos.value).replace('UTG+1', 'UTG1').replace('UTG+2', 'UTG2');
+      if (base === 'UTG2') base = 'LJ';
+      const d = parseInt(depth.value, 10);
+      paintRangeGrid(grid, (k) => {
+        const st = poker.rfiStatus(base, k, d);
+        return st === 'open' ? 'raise' : st;
+      });
+    };
+    fillPos();
+    draw();
+    players.addEventListener('change', () => { fillPos(); draw(); });
+    pos.addEventListener('change', draw);
+    depth.addEventListener('change', draw);
+    card = h('div', { class: 'card' },
+      h('h2', {}, 'Opening range (RFI)'),
       h('div', { class: 'field-grid' },
         h('div', {}, h('label', {}, 'Players'), players),
         h('div', {}, h('label', {}, 'Position'), pos),
-        h('div', {}, h('label', {}, 'Depth'), depth),
-      ),
-      h('p', { class: 'muted small' }, 'Upper-right = suited · lower-left = offsuit · diagonal = pairs. 8-max RFI model mapped by seat.'),
+        h('div', {}, h('label', {}, 'Depth'), depth)),
+      h('p', { class: 'muted small' }, 'Upper-right = suited · lower-left = offsuit · diagonal = pairs.'),
       grid,
-      h('div', { class: 'legend' },
-        h('span', {}, h('i', { class: 'sw sw-open' }), 'Open'),
-        h('span', {}, h('i', { class: 'sw sw-mix' }), 'Mix'),
-        h('span', {}, h('i', { class: 'sw sw-fold' }), 'Fold'),
+      legend([['open', 'Open'], ['mix', 'Mix'], ['fold', 'Fold']]),
+    );
+  } else if (mode === 'vsopen') {
+    const heroSel = sel(['LJ', 'HJ', 'CO', 'BTN', 'SB', 'BB']);
+    heroSel.value = 'BTN';
+    const opSel = sel(poker.BASE_POSITIONS);
+    opSel.value = 'CO';
+    const draw = () => paintRangeGrid(grid, (k) => poker.rangeStatus('vsopen', heroSel.value, opSel.value, k));
+    draw();
+    [heroSel, opSel].forEach((el) => el.addEventListener('change', draw));
+    card = h('div', { class: 'card' },
+      h('h2', {}, 'Facing an open'),
+      h('div', { class: 'field-grid two' },
+        h('div', {}, h('label', {}, 'Your seat'), heroSel),
+        h('div', {}, h('label', {}, 'Opener'), opSel)),
+      h('p', { class: 'muted small' }, '100 BB. Gold = 3-bet for value, lime = 3-bet bluff / mix, blue = call.'),
+      grid,
+      legend([['open', '3-bet'], ['mix', 'Bluff/mix'], ['call', 'Call'], ['fold', 'Fold']]),
+    );
+  } else if (mode === 'defend') {
+    const opSel = sel(poker.BASE_POSITIONS.filter((p) => p !== 'BB'));
+    opSel.value = 'BTN';
+    const draw = () => paintRangeGrid(grid, (k) => poker.rangeStatus('defend', 'BB', opSel.value, k));
+    draw();
+    opSel.addEventListener('change', draw);
+    card = h('div', { class: 'card' },
+      h('h2', {}, 'Defending the big blind'),
+      h('label', {}, 'Opener'), opSel,
+      h('p', { class: 'muted small' }, 'You are in the BB getting a price. Gold = 3-bet, lime = bluff, blue = call.'),
+      grid,
+      legend([['open', '3-bet'], ['mix', 'Bluff'], ['call', 'Call'], ['fold', 'Fold']]),
+    );
+  } else {
+    // build
+    const b = nav.state.rangeBuild || (nav.state.rangeBuild = { hands: [], name: '' });
+    const set = new Set(b.hands);
+    const count = h('span', { class: 'pmeta' });
+    const sync = () => { b.hands = [...set]; count.textContent = `${set.size} combos`; };
+    paintRangeGrid(grid, (k) => (set.has(k) ? 'in' : 'fold'), (k, td) => {
+      if (set.has(k)) { set.delete(k); td.className = 'rg rg-fold'; } else { set.add(k); td.className = 'rg rg-open'; }
+      sync();
+    });
+    sync();
+    const nameIn = h('input', { type: 'text', placeholder: 'Range name', value: b.name, oninput: () => { b.name = nameIn.value; } });
+    const saved = loadCustomRanges();
+    card = h('div', { class: 'card' },
+      h('h2', {}, 'Build a range'),
+      h('p', { class: 'muted small' }, 'Tap cells to add / remove, then save it and use it as a hero or villain range in Equity.'),
+      grid,
+      count,
+      nameIn,
+      h('div', { class: 'btn-row' },
+        h('button', { class: 'primary', html: fx.icon('check') + 'Save', onclick: () => {
+          if (!b.name.trim()) return nav.toast('Name it first');
+          if (!set.size) return nav.toast('Add some hands');
+          saveCustomRange(b.name.trim(), set);
+          nav.toast('Saved');
+          nav.render();
+        } }),
+        h('button', { class: 'ghost', html: fx.icon('trash') + 'Clear', onclick: () => { nav.state.rangeBuild = { hands: [], name: b.name }; nav.render(); } }),
       ),
-    ),
-    backbar(),
-  ];
+      saved.length
+        ? h('div', {},
+            h('h2', {}, 'Saved ranges'),
+            ...saved.map((r) => h('div', { class: 'kitty-row' },
+              h('span', { class: 'kr-name' }, `${r.name} · ${r.hands.length}`),
+              h('button', { class: 'sm ghost', html: 'Load', onclick: () => { nav.state.rangeBuild = { hands: [...r.hands], name: r.name }; nav.render(); } }),
+              h('button', { class: 'sm danger icon-only', 'aria-label': 'Delete ' + r.name, html: fx.icon('close'),
+                onclick: () => { if (confirm(`Delete "${r.name}"?`)) { deleteCustomRange(r.id); nav.render(); } } }),
+            )))
+        : null,
+    );
+  }
+
+  return [toolHead('Ranges'), modeBar, card, backbar()];
 }
 
 // ---------- Action advisor ----------
@@ -548,39 +632,114 @@ export function viewQuiz() {
 export function viewEquity() {
   const mkRank = (req) => sel([...(req ? [] : [['', '—']]), ...poker.EQ_RANKS.map((x) => [x, x])]);
   const mkSuit = (req) => sel([...(req ? [] : [['', '—']]), ...poker.EQ_SUITS.map((x) => [x, poker.EQ_SUIT_SYM[x]])]);
-  const hR1 = mkRank(true), hS1 = mkSuit(true), hR2 = mkRank(true), hS2 = mkSuit(true);
-  hR1.value = 'A'; hS1.value = 's'; hR2.value = 'K'; hS2.value = 'd';
-  const board = Array.from({ length: 5 }, () => ({ r: mkRank(false), s: mkSuit(false) }));
-  const range = sel([
-    ['premium', 'Premium — JJ+, AK (~4%)'],
-    ['strong', 'Strong — 99+, ATs+, AQo+ (~12%)'],
-    ['wide', 'Wide — pairs, broadways, SC (~30%)'],
+  const pick = (defR, defS, req) => {
+    const r = mkRank(req);
+    const s = mkSuit(req);
+    if (defR) r.value = defR;
+    if (defS) s.value = defS;
+    return { r, s, idx: () => poker.cardIndex(r.value, s.value), el: h('div', { class: 'card-pick' }, r, s) };
+  };
+
+  const custom = loadCustomRanges();
+  const rangeOpts = [
     ['random', 'Random — any two'],
-  ]);
-  range.value = 'strong';
-  const res = h('div', {}, h('p', { class: 'muted empty' }, 'Enter your hand and run.'));
+    ['wide', 'Wide — pairs, broadways, SC (~30%)'],
+    ['strong', 'Strong — 99+, ATs+, AQo+ (~12%)'],
+    ['premium', 'Premium — JJ+, AK (~4%)'],
+    ...custom.map((c) => ['custom:' + c.id, `${c.name} (${c.hands.length})`]),
+  ];
+  const rangeSpec = (val) => {
+    if (val && val.startsWith('custom:')) {
+      const c = custom.find((x) => 'custom:' + x.id === val);
+      return c ? new Set(c.hands) : 'random';
+    }
+    return val;
+  };
+
+  // hero
+  const hH1 = pick('A', 's', false);
+  const hH2 = pick('K', 'd', false);
+  const heroHandUI = h('div', { class: 'field-grid two' }, hH1.el, hH2.el);
+  const heroRangeSel = sel(rangeOpts);
+  heroRangeSel.value = 'strong';
+  const heroRangeUI = h('div', { hidden: 'true' }, heroRangeSel);
+  let heroMode = 'hand';
+  const heroSeg = h('div', { class: 'seg' },
+    h('button', { class: 'seg-btn on', onclick: () => setHero('hand') }, 'A hand'),
+    h('button', { class: 'seg-btn', onclick: () => setHero('range') }, 'A range'));
+  const setHero = (m) => {
+    heroMode = m;
+    heroHandUI.hidden = m !== 'hand';
+    heroRangeUI.hidden = m !== 'range';
+    [...heroSeg.children].forEach((btn, i) => btn.classList.toggle('on', ['hand', 'range'][i] === m));
+  };
+
+  // villain
+  const vH1 = pick('', '', false);
+  const vH2 = pick('', '', false);
+  const villHandUI = h('div', { class: 'field-grid two', hidden: 'true' }, vH1.el, vH2.el);
+  const villRangeSel = sel(rangeOpts);
+  villRangeSel.value = 'strong';
+  const villRangeUI = h('div', {}, villRangeSel);
+  let villMode = 'range';
+  const villSeg = h('div', { class: 'seg' },
+    h('button', { class: 'seg-btn on', onclick: () => setVill('range') }, 'A range'),
+    h('button', { class: 'seg-btn', onclick: () => setVill('hand') }, 'A hand'));
+  const setVill = (m) => {
+    villMode = m;
+    villRangeUI.hidden = m !== 'range';
+    villHandUI.hidden = m !== 'hand';
+    [...villSeg.children].forEach((btn, i) => btn.classList.toggle('on', ['range', 'hand'][i] === m));
+  };
+
+  // board
+  const board = Array.from({ length: 5 }, () => pick('', '', false));
+
+  const res = h('div', {}, h('p', { class: 'muted empty' }, 'Set it up and run.'));
   const runBtn = h('button', { class: 'primary wide', html: 'Run simulation' });
 
   const run = () => {
-    const c1 = poker.cardIndex(hR1.value, hS1.value);
-    const c2 = poker.cardIndex(hR2.value, hS2.value);
-    if (c1 == null || c2 == null) { res.replaceChildren(h('div', { class: 'banner loss' }, 'Select both hole cards.')); return; }
-    if (c1 === c2) { res.replaceChildren(h('div', { class: 'banner loss' }, 'Both hole cards are the same.')); return; }
-    const b = board.map(({ r, s }) => poker.cardIndex(r.value, s.value)).filter((c) => c != null);
-    const all = [c1, c2, ...b];
-    if (new Set(all).size < all.length) { res.replaceChildren(h('div', { class: 'banner loss' }, 'Duplicate cards.')); return; }
+    const b = board.map((p) => p.idx()).filter((c) => c != null);
+    const used = [...b];
+    let heroCards = null;
+    const opts = {};
+
+    if (heroMode === 'hand') {
+      const c1 = hH1.idx();
+      const c2 = hH2.idx();
+      if (c1 == null || c2 == null) return fail('Pick both of your cards.');
+      heroCards = [c1, c2];
+      used.push(c1, c2);
+    } else {
+      opts.hero = rangeSpec(heroRangeSel.value);
+    }
+
+    if (villMode === 'hand') {
+      const c1 = vH1.idx();
+      const c2 = vH2.idx();
+      if (c1 == null || c2 == null) return fail("Pick both of the villain's cards.");
+      opts.villainHand = [c1, c2];
+      used.push(c1, c2);
+    } else {
+      opts.villain = rangeSpec(villRangeSel.value);
+    }
+
+    if (new Set(used).size < used.length) return fail('Duplicate cards.');
+
     runBtn.textContent = 'Running…';
     runBtn.disabled = true;
     setTimeout(() => {
-      const r = poker.runMC([c1, c2], b, range.value, 1500);
+      const r = poker.runMC(heroCards, b, opts, 2000);
       runBtn.textContent = 'Run simulation';
       runBtn.disabled = false;
-      if (!r) { res.replaceChildren(h('div', { class: 'banner warn' }, 'Not enough villain combos. Try a wider range.')); return; }
+      if (!r) return fail('Not enough combos — widen a range.');
       const hp = parseFloat(r.hero);
       const tone = hp >= 55 ? 'win' : hp >= 40 ? 'gold' : 'loss';
+      const label = (heroMode === 'hand' ? poker.comboKey(...heroCards) : 'your range') +
+        ' vs ' + (villMode === 'hand' ? poker.comboKey(opts.villainHand[0], opts.villainHand[1]) : 'their range');
       res.replaceChildren(
         h('div', { class: 'big-result t-' + tone }, r.hero + '%'),
-        h('div', { class: 'pmeta center' }, 'Your equity'),
+        h('div', { class: 'pmeta center' }, label),
         h('div', { class: 'eq-bar' },
           h('i', { style: `width:${r.hero}%` }),
           h('i', { class: 'tie', style: `width:${r.tie}%` }),
@@ -590,28 +749,33 @@ export function viewEquity() {
           statBox(r.hero + '%', 'Hero', tone),
           statBox(r.villain + '%', 'Villain', 'loss'),
         ),
-        h('p', { class: 'muted small' }, `Board: ${b.length ? b.map(poker.cardLabel).join(' ') : 'preflop'} · tie ${r.tie}% · 1,500 sims`),
+        h('p', { class: 'muted small' }, `Board: ${b.length ? b.map(poker.cardLabel).join(' ') : 'preflop'} · tie ${r.tie}% · 2,000 sims`),
       );
       fx.haptic(12);
     }, 10);
   };
+  const fail = (msg) => { res.replaceChildren(h('div', { class: 'banner loss' }, msg)); };
   runBtn.addEventListener('click', run);
 
   return [
     toolHead('Equity'),
     h('div', { class: 'card' },
-      h('h2', {}, 'Hand vs range'),
-      h('p', { class: 'muted small' }, 'Monte-Carlo simulation, 1,500 runs.'),
-      h('label', {}, 'Your hand'),
-      h('div', { class: 'field-grid two' },
-        h('div', { class: 'card-pick' }, hR1, hS1),
-        h('div', { class: 'card-pick' }, hR2, hS2),
-      ),
-      h('label', {}, 'Board (optional)'),
-      h('div', { class: 'board-grid' }, ...board.map(({ r, s }) => h('div', { class: 'card-pick' }, r, s))),
-      h('label', {}, 'Villain range'), range,
-      runBtn,
+      h('h2', {}, 'Your hand'),
+      heroSeg,
+      heroHandUI,
+      heroRangeUI,
     ),
+    h('div', { class: 'card' },
+      h('h2', {}, 'Villain'),
+      villSeg,
+      villRangeUI,
+      villHandUI,
+    ),
+    h('div', { class: 'card' },
+      h('h2', {}, 'Board (optional)'),
+      h('div', { class: 'board-grid' }, ...board.map((p) => p.el)),
+    ),
+    runBtn,
     h('div', { class: 'card' }, h('h2', {}, 'Result'), res),
     backbar(),
   ];
