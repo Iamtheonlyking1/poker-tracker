@@ -19,9 +19,14 @@ import {
   loadCustomRanges,
   saveCustomRange,
   deleteCustomRange,
+  loadSoundOn,
+  saveSoundOn,
 } from './state.js';
 import { sessionNets, icmEquities, payouts as tPayouts, prizePool as tPrizePool } from './tournament.js';
 import { exportBlob, importAll, summarize, markExported } from './backup.js';
+import { qrSvg } from './qr.js';
+import { resultsImageBlob, resultsImageFile } from './share-image.js';
+import { setSoundEnabled, chip as soundChip } from './sound.js';
 
 // ---------- controller hook (set once by app.js to avoid a circular import) ----------
 
@@ -122,6 +127,92 @@ export function openCurrencyPicker(currentCode, onPick) {
   setTimeout(() => search.focus(), 60);
 }
 
+// ---------- generic bottom sheet (share image / QR) ----------
+
+export function openSheet(title, bodyNodes) {
+  const body = h('div', { class: 'sheet-list' }, ...[].concat(bodyNodes).filter(Boolean));
+  const sheet = h('div', { class: 'sheet', role: 'dialog', 'aria-modal': 'true', 'aria-label': title },
+    h('div', { class: 'sheet-head' },
+      h('b', {}, title),
+      h('button', { class: 'sm ghost icon-only', 'aria-label': 'Close', html: fx.icon('close'), onclick: () => close() }),
+    ),
+    body,
+  );
+  const wrap = h('div', { class: 'sheet-wrap' },
+    h('div', { class: 'sheet-backdrop', onclick: () => close() }),
+    sheet,
+  );
+  const onKey = (e) => { if (e.key === 'Escape') close(); };
+  function close() {
+    document.removeEventListener('keydown', onKey);
+    wrap.classList.add('closing');
+    setTimeout(() => wrap.remove(), 200);
+  }
+  document.addEventListener('keydown', onKey);
+  document.body.append(wrap);
+  fx.attachRipples(wrap);
+  return { close, body };
+}
+
+export function showQR(url) {
+  let svg = '';
+  try {
+    svg = qrSvg(url, { ecc: 'M', border: 3, dark: '#0b1f16', light: '#ffffff' });
+  } catch (e) {
+    nav.toast('Link too long for a QR');
+    return;
+  }
+  openSheet('Scan to open', [
+    h('div', { class: 'qr-box', html: svg }),
+    h('p', { class: 'muted small qr-url' }, url),
+    h('button', { class: 'ghost wide', html: fx.icon('copy') + 'Copy link', onclick: async () => {
+      try { await navigator.clipboard.writeText(url); nav.toast('Link copied'); } catch (e) { nav.toast('Copy failed'); }
+    } }),
+  ]);
+}
+
+export async function showResultsImage(data) {
+  const name = (slug(data.title) || 'poker-night') + '.png';
+  const img = h('img', { class: 'share-img', alt: 'Results card' });
+  const status = h('p', { class: 'muted small' }, 'Rendering…');
+  const saveBtn = h('button', { class: 'primary wide', html: fx.icon('download') + 'Save image', disabled: 'true' });
+  const shareBtn = h('button', { class: 'ghost wide', html: fx.icon('share') + 'Share…' });
+  shareBtn.hidden = true;
+  openSheet('Results image', [
+    h('div', { class: 'share-img-wrap' }, img, status),
+    h('div', { class: 'sheet-actions' }, saveBtn, shareBtn),
+  ]);
+  try {
+    const blob = await resultsImageBlob(data);
+    const url = URL.createObjectURL(blob);
+    img.src = url;
+    status.remove();
+    saveBtn.removeAttribute('disabled');
+    saveBtn.onclick = () => {
+      const a = h('a', { href: url, download: name });
+      document.body.append(a);
+      a.click();
+      a.remove();
+      nav.toast('Image saved');
+    };
+    try {
+      const file = new File([blob], name, { type: 'image/png' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        shareBtn.hidden = false;
+        shareBtn.onclick = async () => {
+          try { await navigator.share({ files: [file], title: data.title }); } catch (e) {}
+        };
+      }
+    } catch (e) {}
+  } catch (e) {
+    status.textContent = 'Could not render the image on this device.';
+  }
+}
+
+function slug(s) {
+  return String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+}
+
 // ---------- Home hub ----------
 
 const TILES = [
@@ -135,7 +226,7 @@ const TILES = [
   ['icm', 'scale', 'ICM / Chop', 'Fair split by chip stacks'],
   ['study', 'book', 'Study', 'Sizing, blockers, theory'],
   ['sessions', 'ledger', 'My Sessions', 'Personal cash-game log'],
-  ['data', 'database', 'Data', 'Back up & restore'],
+  ['data', 'database', 'Data & sound', 'Backup, restore, sound'],
 ];
 
 export function viewHome() {
@@ -1299,8 +1390,16 @@ export function viewData() {
     fileIn.value = '';
   });
 
+  const soundToggle = h('input', { type: 'checkbox', role: 'switch', class: 'switch' });
+  soundToggle.checked = loadSoundOn();
+  soundToggle.addEventListener('change', () => {
+    saveSoundOn(soundToggle.checked);
+    setSoundEnabled(soundToggle.checked);
+    if (soundToggle.checked) { soundChip(); fx.haptic(10); }
+  });
+
   return [
-    toolHead('Data'),
+    toolHead('Data & sound'),
     h('div', { class: 'card' },
       h('h2', {}, 'Backup'),
       status,
@@ -1312,6 +1411,16 @@ export function viewData() {
       h('p', { class: 'muted small' }, 'Load a backup file. You choose replace (wipe and load) or merge (keep both sets, de-duped).'),
       h('button', { class: 'ghost wide', html: fx.icon('upload') + 'Restore from file', onclick: () => fileIn.click() }),
       fileIn,
+    ),
+    h('div', { class: 'card' },
+      h('h2', {}, 'Sound'),
+      h('label', { class: 'switch-row' },
+        h('span', {},
+          h('span', { class: 'pname sm', html: fx.icon('volume') + 'Sound effects' }),
+          h('span', { class: 'pmeta' }, 'Chip taps on buy-ins, a flourish on results'),
+        ),
+        soundToggle,
+      ),
     ),
     backbar(),
   ];

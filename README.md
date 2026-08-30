@@ -24,8 +24,10 @@ GitHub Pages. Installable as a phone app (works offline).
 4. **Results** — net ±₹ per player (biggest winner gets a crown), session stats,
    and a settlement list like `Rahul pays Ankit ₹1,200`. **Tap a payment** to
    mark it paid (`2/4 paid`); it persists, and you can re-open a saved game from
-   History to tick the rest off later. Buttons: **Share to WhatsApp**, **Copy
-   summary / link**, **Save to history**.
+   History to tick the rest off later. Buttons: **Share to WhatsApp**, **Save
+   image** (a felt-and-gold results card as a PNG — share sheet where supported,
+   download otherwise), **Show QR** (the share link as a scannable code — also on
+   the History game rows), **Copy summary / link**, **Save to history**.
 5. **History** — past games plus a lifetime leaderboard; **tap any name** for
    that player's stats (games, net, win rate, best/worst night, cumulative
    trend).
@@ -89,9 +91,11 @@ here.
 - **Players** — a saved roster of regulars with a private per-player note
   ("overfolds to 3-bets"). Saved players appear as one-tap chips on the setup
   screen; the note shows on their card during the game.
-- **Data** — download a backup of everything (history, sessions, roster,
+- **Data & sound** — download a backup of everything (history, sessions, roster,
   settings) to a JSON file, and restore it — replace or merge. The only way to
-  move your data to a new phone or recover it after a browser wipe.
+  move your data to a new phone or recover it after a browser wipe. Also a
+  **sound effects** toggle (off by default) — chip taps on buy-ins, a short
+  flourish on the results screen, all synthesised with Web Audio, no asset files.
 
 Old `ptk_sessions` / `ptk_quiz` localStorage data from the standalone toolkit is
 migrated on first load.
@@ -101,6 +105,9 @@ migrated on first load.
 "Copy link" encodes the whole session into the URL after `#s=`. Anyone who opens
 it sees a read-only results screen; they can tap "Open as my session" to pull it
 into their own device. Works for ~8 players well within URL length limits.
+"Show QR" turns that same link into a code to scan across the table — the
+encoder steps its error-correction level down for very long links rather than
+failing.
 
 ## Settlement logic
 
@@ -116,7 +123,7 @@ optimal — but you will not find a shorter list at a kitchen table.
 ## Develop
 
 ```bash
-npm test        # settlement unit tests (node --test, no deps)
+npm test        # settle / poker / tournament / QR unit tests (node --test, no deps)
 npm run serve   # python3 -m http.server 8000, open http://localhost:8000
 ```
 
@@ -131,10 +138,13 @@ npm run serve   # python3 -m http.server 8000, open http://localhost:8000
 | `src/state.js` | session model, localStorage, undo, currency pref, session log, quiz score, roster, structures |
 | `src/money.js` | active-currency formatting + world currency list (`Intl`) |
 | `src/share.js` | URL snapshot encode/decode, WhatsApp/plain-text summary |
+| `src/share-image.js` | canvas render of a results card → PNG blob (cash + tournament) |
+| `src/qr.js` | dependency-free QR encoder (byte mode, all 40 versions) → SVG |
+| `src/sound.js` | Web Audio blips (chip / cash / fanfare); off by default |
 | `src/ui.js` | presentation helpers (`h`, avatars, formatting) |
 | `src/fx.js` | SVG icons, motion, haptics — all gated on `prefers-reduced-motion` |
 | `src/charts.js` | tiny canvas P&L charts for the session log |
-| `src/tools.js` | the 8 study-tool views + Home hub |
+| `src/tools.js` | the study-tool views + Home hub + the share-image / QR sheets |
 | `src/app.js` | game views + render loop + navigation |
 | `manifest.json`, `sw.js`, `icon-*.png` | PWA / offline |
 | `tests/*.test.js` | `node --test` suites (settlement + poker logic) |

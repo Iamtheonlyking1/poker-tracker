@@ -4,7 +4,7 @@
 import { h, avatar, escapeHtml } from './ui.js';
 import * as fx from './fx.js';
 import { fmtMoney, currencySymbol, currencyName, currencyCode, setCurrency } from './money.js';
-import { openCurrencyPicker } from './tools.js';
+import { openCurrencyPicker, showResultsImage } from './tools.js';
 import { nav } from './tools.js';
 import { settle } from './settle.js';
 import {
@@ -453,9 +453,24 @@ export function viewTournamentResults(fromHistory) {
     }
   }
 
+  const imgData = {
+    title: s.name,
+    dateMs: s.startedAt,
+    subtitle: `${T.totalEntries(s)} entries · pool ${fmtMoney(T.prizePool(s))} · ${fmtDurationMs(durMs)}`,
+    nets: nets.map((r) => ({ name: r.name, net: r.net })),
+    transfers,
+    kitty: null,
+    fmt: (n) => fmtMoney(n),
+  };
+  out.push(
+    h('div', { style: 'height:16px' }),
+    h('div', { class: 'btn-row' },
+      h('button', { class: 'wide', html: fx.icon('image') + 'Save results image', onclick: () => showResultsImage(imgData) }),
+    ),
+  );
+
   if (!fromHistory) {
     out.push(
-      h('div', { style: 'height:16px' }),
       h('div', { class: 'btn-row' },
         h('button', { class: 'wide', html: fx.icon('check') + 'Save to history & finish', onclick: () => {
           saveToHistory(s);

@@ -17,6 +17,7 @@ import {
   saveCurrencyPref,
   loadRoster,
   noteFor,
+  loadSoundOn,
   pushUndo,
   popUndo,
   canUndo,
@@ -26,7 +27,8 @@ import { summaryText, shareUrl, whatsappUrl, sessionFromUrl } from './share.js';
 import { fmtMoney, setCurrency, currencyName, currencySymbol } from './money.js';
 import { h, escapeHtml, fmtNet, netCount, avatar, fmtDuration } from './ui.js';
 import * as fx from './fx.js';
-import { setNav, TOOL_VIEWS, openCurrencyPicker } from './tools.js';
+import { setNav, TOOL_VIEWS, openCurrencyPicker, showQR, showResultsImage } from './tools.js';
+import { setSoundEnabled, chip as soundChip, cash as soundCash, fanfare as soundFanfare } from './sound.js';
 import {
   TOURN_VIEWS,
   tournamentTick,
@@ -250,6 +252,7 @@ function viewLive() {
     fx.floatUp(rect, '+' + fmtMoney(amount));
     fx.pop(document.getElementById('pot-amt'));
     fx.haptic(10);
+    soundChip();
   };
 
   const cards = s.players.map((p) => {
@@ -340,6 +343,7 @@ function viewLive() {
           if (!confirm(`Add a ${fmtMoney(s.defaultBuyIn)} buy-in for all ${s.players.length} players?`)) return;
           mutate((ss) => rebuyAll(ss));
           fx.haptic([12, 30, 12]);
+          soundChip();
           fx.pop(document.getElementById('pot-amt'));
           toast(`Round added · ${fmtMoney(s.defaultBuyIn * s.players.length)}`);
         },
@@ -447,6 +451,7 @@ function viewCashout() {
         banner.classList.add('flash');
         setTimeout(() => banner.classList.remove('flash'), 800);
         fx.haptic([12, 40, 12]);
+        soundCash();
       }
     } else {
       banner.className = 'banner warn';
@@ -596,6 +601,23 @@ function resultsBlock(s, { animate = false, checkable = false, persist = () => {
   return out;
 }
 
+function imageDataForCash(s) {
+  const extras = kittyExtras(s);
+  const durMs = (s.settledAt || Date.now()) - s.startedAt;
+  return {
+    title: s.name,
+    dateMs: s.startedAt,
+    subtitle: `${s.players.length} players · ${fmtMoney(potIn(s.players))} in play · ${fmtDuration(durMs)}`,
+    nets: s.players.map((p) => ({ name: p.name, net: net(p) || 0 })),
+    transfers: settle(s.players, extras),
+    kitty:
+      s.kitty && extras.length
+        ? { label: s.kitty.label || '', lines: extras.map((e) => ({ name: e.from, amount: e.amount })) }
+        : null,
+    fmt: (n) => fmtMoney(n),
+  };
+}
+
 function viewResults() {
   const s = state.session;
   const blocks = resultsBlock(s, { animate: true, checkable: true, persist: () => save(s) });
@@ -603,6 +625,10 @@ function viewResults() {
     h('div', { style: 'height:16px' }),
     h('div', { class: 'btn-row' },
       h('button', { class: 'primary wide', html: fx.icon('share') + 'Share to WhatsApp', onclick: () => window.open(whatsappUrl(s), '_blank') }),
+    ),
+    h('div', { class: 'btn-row' },
+      h('button', { html: fx.icon('image') + 'Save image', onclick: () => showResultsImage(imageDataForCash(s)) }),
+      h('button', { html: fx.icon('qr') + 'Show QR', onclick: () => showQR(shareUrl(s)) }),
     ),
     h('div', { class: 'btn-row' },
       h('button', { html: fx.icon('copy') + 'Copy summary', onclick: () => copy(summaryText(s)) }),
@@ -636,6 +662,10 @@ function viewShared() {
   blocks.unshift(h('div', { class: 'banner info', html: fx.icon('eye') + (fromHistory ? 'Saved game — tap a payment to mark it paid' : 'Shared results — read only') }));
   blocks.push(
     h('div', { style: 'height:16px' }),
+    h('div', { class: 'btn-row' },
+      h('button', { html: fx.icon('image') + 'Save image', onclick: () => showResultsImage(imageDataForCash(s)) }),
+      h('button', { html: fx.icon('qr') + 'Show QR', onclick: () => showQR(shareUrl(s)) }),
+    ),
     h('div', { class: 'btn-row' },
       h('button', { html: fx.icon('copy') + 'Copy summary', onclick: () => copy(summaryText(s, { withLink: false })) }),
       h('button', { class: 'primary', html: fx.icon('check') + 'Open as my session', onclick: () => {
@@ -712,7 +742,12 @@ function viewHistory() {
         ),
         h('div', { class: 'btn-row' },
           h('button', { class: 'sm', html: fx.icon('eye') + 'View', onclick: () => { state.shared = s; state.sharedId = s.id; go('shared'); } }),
-          h('button', { class: 'sm', html: fx.icon('copy') + 'Link', onclick: () => copy(shareUrl(s)) }),
+          s.type === 'tournament'
+            ? null
+            : h('button', { class: 'sm', html: fx.icon('copy') + 'Link', onclick: () => copy(shareUrl(s)) }),
+          s.type === 'tournament'
+            ? null
+            : h('button', { class: 'sm icon-only', 'aria-label': 'Show QR code', html: fx.icon('qr'), onclick: () => showQR(shareUrl(s)) }),
           h('button', { class: 'sm danger icon-only', 'aria-label': 'Delete game', html: fx.icon('trash'),
             onclick: () => { if (confirm('Delete this game?')) { deleteFromHistory(s.id); render(); } } }),
         ),
@@ -784,6 +819,7 @@ function render(opts = {}) {
 function afterResults() {
   fx.celebrate();
   fx.haptic([15, 50, 15, 50, 25]);
+  soundFanfare();
   app.querySelectorAll('[data-count]').forEach((el) => {
     const to = Number(el.dataset.count);
     const sign = to > 0 ? '+' : '−';
@@ -817,4 +853,5 @@ function boot() {
 }
 
 setNav({ go, toast, state, render });
+setSoundEnabled(loadSoundOn());
 boot();

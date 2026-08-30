@@ -16,6 +16,7 @@ export const STORE_KEYS = [
   'poker.quiz',
   'poker.structures',
   'poker.customRanges',
+  'poker.sound',
 ];
 
 const STRUCTURES_KEY = 'poker.structures';
@@ -317,6 +318,24 @@ export function noteFor(name) {
   const clean = (name || '').trim().toLowerCase();
   const hit = loadRoster().find((r) => r.name.toLowerCase() === clean);
   return hit ? hit.note || '' : '';
+}
+
+// ---- sound preference (off by default) ----
+
+const SOUND_KEY = 'poker.sound';
+
+export function loadSoundOn() {
+  try {
+    return localStorage.getItem(SOUND_KEY) === '1';
+  } catch (e) {
+    return false;
+  }
+}
+
+export function saveSoundOn(on) {
+  try {
+    localStorage.setItem(SOUND_KEY, on ? '1' : '0');
+  } catch (e) {}
 }
 
 // ---- raw store access (for backup / import) ----
