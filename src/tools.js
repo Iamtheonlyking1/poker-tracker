@@ -3,7 +3,7 @@
 
 import { h, avatar } from './ui.js';
 import * as fx from './fx.js';
-import { fmtMoney, currencySymbol, currencyCode } from './money.js';
+import { fmtMoney, currencySymbol, currencyCode, allCurrencies, currencyName, setCurrency } from './money.js';
 import * as poker from './poker.js';
 import { drawLineChart, drawBarChart } from './charts.js';
 import {
@@ -17,14 +17,16 @@ import {
   upsertRosterPlayer,
   deleteRosterPlayer,
 } from './state.js';
-import { net } from './settle.js';
+import { sessionNets } from './tournament.js';
 import { exportBlob, importAll, summarize, markExported } from './backup.js';
 
 // ---------- controller hook (set once by app.js to avoid a circular import) ----------
 
-let nav = { go() {}, toast() {}, state: {} };
+// A shared, mutable context. app.js fills it at boot; other view modules
+// (tournament-views) import this same object.
+export const nav = { go() {}, toast() {}, state: {}, save() {}, render() {} };
 export function setNav(n) {
-  nav = n;
+  Object.assign(nav, n);
 }
 
 // ---------- shared building blocks ----------
@@ -64,6 +66,58 @@ const notesList = (items) =>
     const [k, v] = Array.isArray(it) ? it : [null, it];
     return h('div', { class: 'note' }, k ? h('b', {}, k) : null, h('span', {}, v));
   }));
+
+// ---------- bottom-sheet currency picker (shared with app.js + tournament) ----------
+
+export function openCurrencyPicker(currentCode, onPick) {
+  const all = allCurrencies();
+  const rows = h('div', { class: 'sheet-list' });
+  const search = h('input', {
+    type: 'search', placeholder: 'Search currency or code', 'aria-label': 'Search currency',
+    autocomplete: 'off', enterkeyhint: 'search',
+  });
+  const paint = (q) => {
+    const term = q.trim().toLowerCase();
+    const list = term
+      ? all.filter((c) => c.code.toLowerCase().includes(term) || c.name.toLowerCase().includes(term))
+      : all;
+    const items = list.slice(0, 400).map((c) =>
+      h('button', {
+        class: 'currency-row' + (c.code === currentCode ? ' on' : ''),
+        onclick: () => { close(); onPick(c.code); },
+      },
+        h('span', { class: 'cur-sym' }, c.symbol),
+        h('span', { class: 'cur-name' }, c.name),
+        h('span', { class: 'cur-code' }, c.code),
+      ),
+    );
+    if (!list.length) items.push(h('p', { class: 'muted empty' }, 'No currency matches that.'));
+    rows.replaceChildren(...items);
+  };
+  search.addEventListener('input', () => paint(search.value));
+  const sheet = h('div', { class: 'sheet', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Choose currency' },
+    h('div', { class: 'sheet-head' },
+      h('b', {}, 'Currency'),
+      h('button', { class: 'sm ghost icon-only', 'aria-label': 'Close', html: fx.icon('close'), onclick: () => close() }),
+    ),
+    search,
+    rows,
+  );
+  const wrap = h('div', { class: 'sheet-wrap' },
+    h('div', { class: 'sheet-backdrop', onclick: () => close() }),
+    sheet,
+  );
+  const onKey = (e) => { if (e.key === 'Escape') close(); };
+  function close() {
+    document.removeEventListener('keydown', onKey);
+    wrap.classList.add('closing');
+    setTimeout(() => wrap.remove(), 200);
+  }
+  document.addEventListener('keydown', onKey);
+  document.body.append(wrap);
+  paint('');
+  setTimeout(() => search.focus(), 60);
+}
 
 // ---------- Home hub ----------
 
@@ -786,10 +840,10 @@ function rosterLifetime(name) {
   let games = 0;
   let total = 0;
   for (const s of loadHistory()) {
-    for (const p of s.players || []) {
-      if (p.name.trim().toLowerCase() === key) {
+    for (const r of sessionNets(s)) {
+      if (r.name.trim().toLowerCase() === key) {
         games += 1;
-        total += net(p) || 0;
+        total += r.net;
       }
     }
   }
@@ -870,8 +924,8 @@ export function viewPlayerStats(name) {
   const key = (name || '').trim().toLowerCase();
   const games = [];
   for (const s of loadHistory()) {
-    for (const p of s.players || []) {
-      if (p.name.trim().toLowerCase() === key) games.push({ when: s.startedAt || 0, n: net(p) || 0 });
+    for (const r of sessionNets(s)) {
+      if (r.name.trim().toLowerCase() === key) games.push({ when: s.startedAt || 0, n: r.net });
     }
   }
   games.sort((a, b) => a.when - b.when);

@@ -46,6 +46,9 @@ const P = {
   graph: '<path d="M4 19V5M4 19h16"/><path d="M8 15l3-4 3 2 4-6"/>',
   scale: '<path d="M12 3v18M6 21h12M4 8l4-4 4 4M4 8a4 4 0 0 0 8 0M12 8l4-4 4 4M12 8a4 4 0 0 0 8 0"/>',
   circle: '<circle cx="12" cy="12" r="9"/>',
+  pause: '<rect x="7" y="5" width="3.5" height="14" rx="1"/><rect x="14" y="5" width="3.5" height="14" rx="1"/>',
+  play: '<path d="M8 5l11 7-11 7z"/>',
+  flag: '<path d="M5 21V4"/><path d="M5 4h11l-2 4 2 4H5"/>',
   download: '<path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M4 20h16"/>',
   upload: '<path d="M12 21V9"/><path d="M7 13l5-5 5 5"/><path d="M4 4h16"/>',
   database:

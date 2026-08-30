@@ -708,6 +708,130 @@ label {
   margin-top: 6px;
 }
 
+/* ---------- segmented control ---------- */
+
+.seg {
+  display: flex;
+  gap: 4px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 4px;
+  margin: 10px 0 4px;
+}
+.seg-btn {
+  flex: 1;
+  min-height: 40px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 0.9rem;
+  border-radius: 9px;
+}
+.seg-btn.on {
+  background: rgba(231, 189, 92, 0.14);
+  border-color: var(--gold-deep);
+  color: var(--gold);
+}
+
+/* ---------- tournament ---------- */
+
+.card.sub {
+  margin-top: 0;
+  background: rgba(0, 0, 0, 0.22);
+}
+.struct-row {
+  margin-top: 6px;
+}
+
+.tclock-wrap {
+  text-align: center;
+  background: radial-gradient(120% 90% at 50% 0%, var(--surface-3), var(--surface));
+  border: 1px solid var(--gold-deep);
+  border-radius: var(--radius);
+  padding: 20px 16px 16px;
+  margin: 8px 0 12px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4), 0 0 0 1px var(--gold-glow) inset;
+}
+.tclock-wrap.paused {
+  border-color: var(--border);
+  box-shadow: var(--shadow-card);
+}
+.tclock-wrap.brk {
+  border-color: var(--info);
+}
+.tc-level {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+.tc-blinds {
+  font-size: 1.15rem;
+  font-weight: 700;
+  margin-top: 2px;
+  font-variant-numeric: tabular-nums;
+}
+.tc-time {
+  font-family: "Fraunces", Georgia, serif;
+  font-size: 3.6rem;
+  font-weight: 600;
+  line-height: 1.05;
+  margin: 6px 0 10px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+.tclock-wrap.paused .tc-time {
+  color: var(--muted);
+}
+.tc-ctrls {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+.tc-ctrls .sm.primary {
+  min-width: 120px;
+}
+.tc-next {
+  margin-top: 10px;
+  font-size: 0.82rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.card.tp-out {
+  opacity: 0.6;
+}
+.card.tp-out .btn-row {
+  margin-top: 8px;
+}
+
+.struct-lv .row {
+  margin-bottom: 6px;
+}
+.struct-lv.brk {
+  border-left: 3px solid var(--info);
+}
+.lv-fields {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: end;
+}
+.lv-fields > span {
+  display: flex;
+  flex-direction: column;
+}
+.lv-fields label {
+  margin: 0 0 3px;
+  font-size: 0.68rem;
+}
+.lv-fields input {
+  min-height: 38px;
+}
+
 /* ---------- bottom action bar ---------- */
 
 .actionbar {

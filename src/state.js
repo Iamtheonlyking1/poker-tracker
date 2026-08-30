@@ -14,7 +14,10 @@ export const STORE_KEYS = [
   'poker.roster',
   'poker.sessionlog',
   'poker.quiz',
+  'poker.structures',
 ];
+
+const STRUCTURES_KEY = 'poker.structures';
 
 let undoStack = [];
 
@@ -47,6 +50,55 @@ export function newSession({ name, defaultBuyIn, currency }) {
     players: [],
     status: 'live', // 'live' | 'settled'
   };
+}
+
+export function newTournament({ name, currency, buyIn, startStack, structure, payouts, rebuy, addon }) {
+  return {
+    id: uid(),
+    name: name || 'Tournament',
+    startedAt: Date.now(),
+    currency: currency || loadCurrencyPref(),
+    type: 'tournament',
+    buyIn: Math.max(1, Math.round(buyIn || 500)),
+    startStack: Math.max(1, Math.round(startStack || 10000)),
+    structure: structure || [],
+    payouts: payouts || [{ place: 1, pct: 100 }],
+    rebuy: rebuy || null,
+    addon: addon || null,
+    players: [],
+    clock: null,
+    status: 'live',
+  };
+}
+
+// ---- saved blind structures ----
+
+export function loadStructures() {
+  return readJSON(STRUCTURES_KEY, []);
+}
+
+export function saveStructure(name, levels) {
+  const list = loadStructures().filter((x) => x.name !== name);
+  list.push({ id: uid(), name, levels });
+  writeJSON(STRUCTURES_KEY, list);
+  return list;
+}
+
+export function deleteStructure(id) {
+  const list = loadStructures().filter((x) => x.id !== id);
+  writeJSON(STRUCTURES_KEY, list);
+  return list;
+}
+
+export function addTournamentPlayer(session, name) {
+  const clean = (name || '').trim();
+  if (!clean) return;
+  session.players.push({
+    id: uid(),
+    name: clean,
+    entries: [{ type: 'buyin', amount: session.buyIn, chips: session.startStack, ts: Date.now() }],
+    finish: null,
+  });
 }
 
 export function addPlayer(session, name) {

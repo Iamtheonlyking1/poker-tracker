@@ -30,6 +30,22 @@ GitHub Pages. Installable as a phone app (works offline).
    that player's stats (games, net, win rate, best/worst night, cumulative
    trend).
 
+## Tournament director
+
+On the setup screen, flip **Cash game / Tournament**. A tournament tracks:
+
+- **Blind clock** — big level timer (SB/BB/ante), next-level preview, pause/resume,
+  −/+ a level, auto-advance with a buzz on level change, break levels.
+- **Structure** — Turbo / Standard / Deep presets, or build your own in the
+  editor (add/remove levels + breaks, edit blinds/minutes, save as a preset).
+- **Entries** — per player: rebuy / add-on (gated to the periods you set),
+  **bust out** (records finish place in reverse order — last one standing wins),
+  re-enter during the rebuy period, and late entries.
+- **Results** — prize pool split by your payout structure (WTA / top 2 / 3 / 4);
+  if you end early with players left, **chop** the rest (even or ICM by chip
+  stacks). Net per player and the who-pays-whom list use the same settlement +
+  check-off as a cash game. Saved to History like any other night.
+
 ### Shared expense / kitty
 
 On the cash-out screen, **Add expense / kitty** — name it, pick who fronted the
@@ -103,7 +119,10 @@ npm run serve   # python3 -m http.server 8000, open http://localhost:8000
 | `index.html` | single page, loads the module graph + registers the service worker |
 | `src/settle.js` | net calc + settlement algorithm (pure, unit-tested) |
 | `src/poker.js` | ranges, action advisor, odds/SPR math, MC equity (pure, unit-tested) |
-| `src/state.js` | session model, localStorage, undo, currency pref, session log, quiz score |
+| `src/tournament.js` | blind structures, level clock, entries/busts, prize + ICM math (pure, unit-tested) |
+| `src/tournament-views.js` | tournament setup / live clock / results / structure editor |
+| `src/backup.js` | export / import every store as one JSON file |
+| `src/state.js` | session model, localStorage, undo, currency pref, session log, quiz score, roster, structures |
 | `src/money.js` | active-currency formatting + world currency list (`Intl`) |
 | `src/share.js` | URL snapshot encode/decode, WhatsApp/plain-text summary |
 | `src/ui.js` | presentation helpers (`h`, avatars, formatting) |

@@ -23,10 +23,17 @@ import {
 } from './state.js';
 import { net, totalIn, potIn, settle, reconciliation, kittyExtras } from './settle.js';
 import { summaryText, shareUrl, whatsappUrl, sessionFromUrl } from './share.js';
-import { fmtMoney, setCurrency, currencyName, currencySymbol, allCurrencies } from './money.js';
+import { fmtMoney, setCurrency, currencyName, currencySymbol } from './money.js';
 import { h, escapeHtml, fmtNet, netCount, avatar, fmtDuration } from './ui.js';
 import * as fx from './fx.js';
-import { setNav, TOOL_VIEWS } from './tools.js';
+import { setNav, TOOL_VIEWS, openCurrencyPicker } from './tools.js';
+import {
+  TOURN_VIEWS,
+  tournamentTick,
+  viewTournamentLive,
+  viewTournamentResults,
+} from './tournament-views.js';
+import { sessionNets, prizePool as tournPool } from './tournament.js';
 
 const app = document.getElementById('app');
 
@@ -91,58 +98,6 @@ function elapsedPill(s) {
   });
 }
 
-// bottom-sheet currency picker with search
-function openCurrencyPicker(currentCode, onPick) {
-  const all = allCurrencies();
-  const rows = h('div', { class: 'sheet-list' });
-  const search = h('input', {
-    type: 'search', placeholder: 'Search currency or code', 'aria-label': 'Search currency',
-    autocomplete: 'off', enterkeyhint: 'search',
-  });
-
-  const paint = (q) => {
-    const term = q.trim().toLowerCase();
-    const list = term
-      ? all.filter((c) => c.code.toLowerCase().includes(term) || c.name.toLowerCase().includes(term))
-      : all;
-    const items = list.slice(0, 400).map((c) =>
-      h('button', {
-        class: 'currency-row' + (c.code === currentCode ? ' on' : ''),
-        onclick: () => { close(); onPick(c.code); },
-      },
-        h('span', { class: 'cur-sym' }, c.symbol),
-        h('span', { class: 'cur-name' }, c.name),
-        h('span', { class: 'cur-code' }, c.code),
-      ),
-    );
-    if (!list.length) items.push(h('p', { class: 'muted empty' }, 'No currency matches that.'));
-    rows.replaceChildren(...items);
-  };
-  search.addEventListener('input', () => paint(search.value));
-
-  const sheet = h('div', { class: 'sheet', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Choose currency' },
-    h('div', { class: 'sheet-head' },
-      h('b', {}, 'Currency'),
-      h('button', { class: 'sm ghost icon-only', 'aria-label': 'Close', html: fx.icon('close'), onclick: () => close() }),
-    ),
-    search,
-    rows,
-  );
-  const wrap = h('div', { class: 'sheet-wrap' },
-    h('div', { class: 'sheet-backdrop', onclick: () => close() }),
-    sheet,
-  );
-  const onKey = (e) => { if (e.key === 'Escape') close(); };
-  function close() {
-    document.removeEventListener('keydown', onKey);
-    wrap.classList.add('closing');
-    setTimeout(() => wrap.remove(), 200);
-  }
-  document.addEventListener('keydown', onKey);
-  document.body.append(wrap);
-  paint('');
-  setTimeout(() => search.focus(), 60);
-}
 
 // ---------- setup ----------
 
@@ -253,6 +208,10 @@ function viewSetup() {
     h('div', { class: 'tool-head' },
       h('button', { class: 'sm ghost icon-only', 'aria-label': 'Home', html: fx.icon('home'), onclick: () => go('home') }),
       h('h1', { html: fx.icon('spade') + 'New game' }),
+    ),
+    h('div', { class: 'seg' },
+      h('button', { class: 'seg-btn on' }, 'Cash game'),
+      h('button', { class: 'seg-btn', html: 'Tournament', onclick: () => go('tournsetup') }),
     ),
     h('p', { class: 'muted' }, 'Track buy-ins, settle up clean at the end.'),
     h('h2', {}, 'Session'),
@@ -708,10 +667,10 @@ function viewShared() {
 function lifetimeLeaderboard(hist) {
   const agg = new Map();
   for (const s of hist) {
-    for (const p of s.players) {
-      const key = p.name.trim().toLowerCase();
-      const cur = agg.get(key) || { name: p.name.trim(), net: 0, games: 0 };
-      cur.net += net(p) || 0;
+    for (const r of sessionNets(s)) {
+      const key = r.name.trim().toLowerCase();
+      const cur = agg.get(key) || { name: r.name.trim(), net: 0, games: 0 };
+      cur.net += r.net;
       cur.games += 1;
       agg.set(key, cur);
     }
@@ -747,8 +706,8 @@ function viewHistory() {
       out.push(h('div', { class: 'card' },
         h('div', { class: 'hist-item' },
           h('div', {},
-            h('div', { class: 'pname' }, s.name),
-            h('div', { class: 'pmeta' }, `${new Date(s.startedAt).toLocaleDateString('en-IN', { dateStyle: 'medium' })} · ${s.players.length} players · pot ${fmtMoney(potIn(s.players))}`),
+            h('div', { class: 'pname' }, s.name, s.type === 'tournament' ? h('span', { class: 'tag-mini' }, 'Tournament') : null),
+            h('div', { class: 'pmeta' }, `${new Date(s.startedAt).toLocaleDateString('en-IN', { dateStyle: 'medium' })} · ${s.players.length} players · ${s.type === 'tournament' ? 'pool' : 'pot'} ${fmtMoney(s.type === 'tournament' ? tournPool(s) : potIn(s.players))}`),
           ),
         ),
         h('div', { class: 'btn-row' },
@@ -774,13 +733,15 @@ function viewHistory() {
 
 function nodesFor(view) {
   if (TOOL_VIEWS[view]) return TOOL_VIEWS[view]();
+  if (TOURN_VIEWS[view]) return TOURN_VIEWS[view]();
+  const isTourn = (sess) => sess && sess.type === 'tournament';
   switch (view) {
     case 'setup': return viewSetup();
-    case 'live': return viewLive();
+    case 'live': return isTourn(state.session) ? viewTournamentLive() : viewLive();
     case 'cashout': return viewCashout();
-    case 'results': return viewResults();
+    case 'results': return isTourn(state.session) ? viewTournamentResults(false) : viewResults();
     case 'history': return viewHistory();
-    case 'shared': return viewShared();
+    case 'shared': return isTourn(state.shared) ? viewTournamentResults(true) : viewShared();
     default: return TOOL_VIEWS.home();
   }
 }
@@ -805,7 +766,9 @@ function render(opts = {}) {
   if (nav && !firstPaint) fx.withTransition(paint);
   else paint();
 
-  if ((view === 'live' || view === 'cashout') && state.session) {
+  if (view === 'live' && state.session && state.session.type === 'tournament') {
+    state._tick = setInterval(tournamentTick, 1000);
+  } else if ((view === 'live' || view === 'cashout') && state.session) {
     state._tick = setInterval(() => {
       const el = document.getElementById('elapsed');
       if (el && state.session) el.textContent = fmtDuration(Date.now() - state.session.startedAt);
@@ -853,5 +816,5 @@ function boot() {
   go('home');
 }
 
-setNav({ go, toast, state });
+setNav({ go, toast, state, render });
 boot();
