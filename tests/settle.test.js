@@ -1,9 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { settle, net, totalIn, reconciliation } from '../src/settle.js';
+import { settle, net, totalIn, reconciliation, kittyExtras, kittyTotal } from '../src/settle.js';
 
+let pid = 0;
 function p(name, buyIns, cashOut = null) {
-  return { name, buyIns: buyIns.map((amount) => ({ amount, ts: 0 })), cashOut };
+  return { id: 'p' + pid++, name, buyIns: buyIns.map((amount) => ({ amount, ts: 0 })), cashOut };
 }
 
 // Every transfer list must move each player from their net to zero.
@@ -112,4 +113,55 @@ test('multiple rebuys and a mid-session joiner', () => {
 test('nobody owes anybody when everyone breaks even', () => {
   const players = [p('A', [500], 500), p('B', [500], 500)];
   assert.deepEqual(settle(players), []);
+});
+
+// verify with extras folded in
+function verifyWithExtras(players, extras, transfers) {
+  const bal = {};
+  for (const pl of players) bal[pl.name] = net(pl) || 0;
+  for (const e of extras) { bal[e.from] -= e.amount; bal[e.to] += e.amount; }
+  for (const t of transfers) { bal[t.from] += t.amount; bal[t.to] -= t.amount; }
+  for (const name of Object.keys(bal)) assert.equal(bal[name], 0, `${name} settled to zero`);
+}
+
+test('settle folds a kitty into one combined minimal list', () => {
+  const players = [
+    p('Rahul', [500, 500], 300), // -700
+    p('Ankit', [500], 1700), //  +1200
+    p('Meera', [500, 500], 900), // -100
+    p('Sana', [500], 100), // -400
+  ];
+  // Ankit fronted an ₹800 food bill; split 300/300/200 among Rahul/Sana/Meera
+  const kitty = {
+    label: 'Pizza',
+    paidBy: players[1].id,
+    entries: { [players[0].id]: 300, [players[3].id]: 300, [players[2].id]: 200 },
+  };
+  const extras = kittyExtras({ players, kitty });
+  assert.equal(extras.length, 3);
+  assert.ok(extras.every((e) => e.to === 'Ankit'));
+  assert.equal(kittyTotal({ kitty }), 800);
+
+  const t = settle(players, extras);
+  verifyWithExtras(players, extras, t);
+  // still minimal — everyone owes Ankit, so <= n-1
+  assert.ok(t.length <= 3);
+});
+
+test('kitty entry for the payer nets out', () => {
+  const players = [p('A', [500], 900), p('B', [500], 100)]; // A +400, B -400
+  const kitty = { paidBy: players[0].id, entries: { [players[0].id]: 200, [players[1].id]: 200 } };
+  const extras = kittyExtras({ players, kitty });
+  assert.equal(extras.length, 1); // only B owes A
+  assert.deepEqual(extras[0], { from: 'B', to: 'A', amount: 200 });
+  const t = settle(players, extras);
+  verifyWithExtras(players, extras, t);
+  assert.equal(t.length, 1);
+  assert.equal(t[0].amount, 600); // 400 game + 200 kitty, one payment
+});
+
+test('kittyExtras returns [] for no/blank kitty', () => {
+  const players = [p('A', [500], 500)];
+  assert.deepEqual(kittyExtras({ players }), []);
+  assert.deepEqual(kittyExtras({ players, kitty: { paidBy: null, entries: {} } }), []);
 });

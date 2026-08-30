@@ -12,6 +12,7 @@ import {
   loadHistory,
   saveToHistory,
   deleteFromHistory,
+  updateHistorySession,
   loadCurrencyPref,
   saveCurrencyPref,
   loadRoster,
@@ -20,7 +21,7 @@ import {
   popUndo,
   canUndo,
 } from './state.js';
-import { net, totalIn, potIn, settle, reconciliation } from './settle.js';
+import { net, totalIn, potIn, settle, reconciliation, kittyExtras } from './settle.js';
 import { summaryText, shareUrl, whatsappUrl, sessionFromUrl } from './share.js';
 import { fmtMoney, setCurrency, currencyName, currencySymbol, allCurrencies } from './money.js';
 import { h, escapeHtml, fmtNet, netCount, avatar, fmtDuration } from './ui.js';
@@ -397,6 +398,81 @@ function viewLive() {
 
 // ---------- cash out ----------
 
+// Optional shared expense. Choose who chips in and how much each owes; it folds
+// into the settlement so it's still one minimal payment list.
+function kittyCard(s) {
+  if (!s.kitty) {
+    return h('button', {
+      class: 'ghost wide', html: fx.icon('users') + 'Add expense / kitty',
+      onclick: () => {
+        s.kitty = { label: '', total: '', paidBy: s.players[0] ? s.players[0].id : null, entries: {} };
+        save(s);
+        render();
+      },
+    });
+  }
+  const k = s.kitty;
+  const allocated = h('span', { class: 'pmeta' });
+  const sync = () => {
+    const sum = Object.values(k.entries).reduce((a, x) => a + (parseInt(x, 10) || 0), 0);
+    const total = parseInt(k.total, 10);
+    allocated.textContent = `Allocated ${fmtMoney(sum)}${total > 0 ? ` of ${fmtMoney(total)}` : ''}`;
+  };
+
+  const labelIn = h('input', { type: 'text', placeholder: 'e.g. Pizza + drinks', value: k.label,
+    oninput: () => { k.label = labelIn.value; save(s); } });
+  const totalIn = h('input', { type: 'number', inputmode: 'numeric', placeholder: 'Total (optional)', value: k.total,
+    oninput: () => { k.total = totalIn.value; save(s); sync(); } });
+  const paidBy = h('select', { 'aria-label': 'Paid by',
+    onchange: () => { k.paidBy = paidBy.value; save(s); } },
+    ...s.players.map((p) => h('option', { value: p.id }, p.name)));
+  paidBy.value = k.paidBy || (s.players[0] && s.players[0].id) || '';
+
+  const splitBtn = h('button', { class: 'sm ghost', html: 'Split evenly', onclick: () => {
+    const total = parseInt(k.total, 10);
+    const ids = Object.keys(k.entries);
+    if (!(total > 0) || !ids.length) return toast('Set a total and tick players first');
+    const each = Math.floor(total / ids.length);
+    const rem = total - each * ids.length;
+    ids.forEach((id, i) => { k.entries[id] = each + (i < rem ? 1 : 0); });
+    save(s);
+    render();
+  } });
+
+  const rows = s.players.map((p) => {
+    const included = p.id in k.entries;
+    const amtIn = h('input', {
+      type: 'number', inputmode: 'numeric', class: 'sm', placeholder: '0',
+      value: included ? k.entries[p.id] : '', disabled: included ? null : 'true',
+      oninput: () => { k.entries[p.id] = parseInt(amtIn.value, 10) || 0; save(s); sync(); },
+    });
+    const chk = h('input', { type: 'checkbox', checked: included ? 'true' : null, 'aria-label': 'Include ' + p.name,
+      onchange: () => {
+        if (chk.checked) k.entries[p.id] = k.entries[p.id] || 0;
+        else delete k.entries[p.id];
+        save(s);
+        render();
+      } });
+    return h('label', { class: 'kitty-row' }, chk, h('span', { class: 'kr-name' }, p.name), amtIn);
+  });
+
+  sync();
+  return h('div', { class: 'card kitty-card' },
+    h('div', { class: 'row' },
+      h('b', {}, 'Expense / kitty'),
+      h('button', { class: 'sm danger', html: fx.icon('trash') + 'Remove', onclick: () => { delete s.kitty; save(s); render(); } }),
+    ),
+    h('label', {}, 'What for'),
+    labelIn,
+    h('div', { class: 'field-grid two' },
+      h('div', {}, h('label', {}, 'Paid by'), paidBy),
+      h('div', {}, h('label', {}, 'Total'), totalIn),
+    ),
+    h('div', { class: 'kitty-rows' }, ...rows),
+    h('div', { class: 'row kitty-foot' }, allocated, splitBtn),
+  );
+}
+
 function viewCashout() {
   const s = state.session;
   const banner = h('div', {});
@@ -467,6 +543,8 @@ function viewCashout() {
     ),
     banner,
     h('div', { class: 'cards' }, ...cards),
+    h('h2', {}, 'Shared expense'),
+    kittyCard(s),
     h('div', { class: 'actionbar' },
       h('button', { class: 'ghost', html: fx.icon('back') + 'Back', onclick: () => go('live') }),
       nextBtn,
@@ -476,11 +554,15 @@ function viewCashout() {
 
 // ---------- results ----------
 
-function resultsBlock(s, { animate = false } = {}) {
+function resultsBlock(s, { animate = false, checkable = false, persist = () => {} } = {}) {
   const rec = reconciliation(s.players);
   const rows = s.players.map((p) => ({ name: p.name, n: net(p) || 0 })).sort((a, b) => b.n - a.n);
-  const transfers = settle(s.players);
+  const extras = kittyExtras(s);
+  const transfers = settle(s.players, extras);
   const durMs = (s.settledAt || Date.now()) - s.startedAt;
+  const key = (t) => `${t.from}|${t.to}|${t.amount}`;
+  const isDone = (t) => checkable && s.settled && s.settled[key(t)];
+  const settledCount = transfers.filter(isDone).length;
 
   const out = [
     h('h1', {}, s.name),
@@ -519,13 +601,37 @@ function resultsBlock(s, { animate = false } = {}) {
   });
   out.push(h('div', { class: 'cards' }, ...netCards));
 
-  out.push(h('h2', {}, 'Settle up'));
+  if (s.kitty && extras.length) {
+    const payee = s.players.find((p) => p.id === s.kitty.paidBy);
+    out.push(h('h2', {}, 'Kitty' + (s.kitty.label ? ' — ' + s.kitty.label : '')));
+    out.push(h('div', { class: 'card kitty-summary' },
+      ...extras.map((e) => h('div', { class: 'kr-line' }, `${e.from} — ${fmtMoney(e.amount)}`)),
+      h('div', { class: 'pmeta' }, `Fronted by ${payee ? payee.name : '?'} · folded into the payments below`),
+    ));
+  }
+
+  out.push(h('h2', {}, transfers.length && checkable ? `Settle up · ${settledCount}/${transfers.length} paid` : 'Settle up'));
   if (transfers.length === 0) {
     out.push(h('div', { class: 'banner ok', html: fx.icon('check') + 'Everyone square. Nothing to pay.' }));
   } else {
     for (const t of transfers) {
-      out.push(h('div', { class: 'settle-line',
-        html: `<b>${escapeHtml(t.from)}</b> pays <b>${escapeHtml(t.to)}</b> ${fmtMoney(t.amount)}` }));
+      const done = isDone(t);
+      out.push(h('div', {
+        class: 'settle-line' + (checkable ? ' tappable' : '') + (done ? ' done' : ''),
+        role: checkable ? 'button' : null,
+        html:
+          (checkable ? fx.icon(done ? 'check' : 'circle', 'sl-check') : '') +
+          `<span><b>${escapeHtml(t.from)}</b> pays <b>${escapeHtml(t.to)}</b> ${fmtMoney(t.amount)}</span>`,
+        onclick: checkable
+          ? () => {
+              s.settled = s.settled || {};
+              if (s.settled[key(t)]) delete s.settled[key(t)];
+              else { s.settled[key(t)] = true; fx.haptic(10); }
+              persist();
+              render();
+            }
+          : null,
+      }));
     }
   }
   return out;
@@ -533,7 +639,7 @@ function resultsBlock(s, { animate = false } = {}) {
 
 function viewResults() {
   const s = state.session;
-  const blocks = resultsBlock(s, { animate: true });
+  const blocks = resultsBlock(s, { animate: true, checkable: true, persist: () => save(s) });
   blocks.push(
     h('div', { style: 'height:16px' }),
     h('div', { class: 'btn-row' },
@@ -562,8 +668,13 @@ function viewResults() {
 
 function viewShared() {
   const s = state.shared;
-  const blocks = resultsBlock(s, { animate: true });
-  blocks.unshift(h('div', { class: 'banner info', html: fx.icon('eye') + 'Shared results — read only' }));
+  const fromHistory = !!state.sharedId;
+  const blocks = resultsBlock(s, {
+    animate: true,
+    checkable: fromHistory,
+    persist: () => updateHistorySession(s),
+  });
+  blocks.unshift(h('div', { class: 'banner info', html: fx.icon('eye') + (fromHistory ? 'Saved game — tap a payment to mark it paid' : 'Shared results — read only') }));
   blocks.push(
     h('div', { style: 'height:16px' }),
     h('div', { class: 'btn-row' },
@@ -574,6 +685,7 @@ function viewShared() {
         imp.status = 'live';
         state.session = imp;
         state.shared = null;
+        state.sharedId = null;
         history.replaceState(null, '', location.pathname);
         save(imp);
         go('results');
@@ -582,6 +694,7 @@ function viewShared() {
     h('div', { class: 'btn-row' },
       h('button', { class: 'ghost wide', html: fx.icon('spade') + 'Start my own game', onclick: () => {
         state.shared = null;
+        state.sharedId = null;
         history.replaceState(null, '', location.pathname);
         boot();
       } }),
@@ -613,9 +726,10 @@ function viewHistory() {
   if (!hist.length) {
     out.push(h('p', { class: 'muted empty' }, 'No saved games yet. Finish a game to see it here.'));
   } else {
-    out.push(h('h2', {}, 'Lifetime'));
+    out.push(h('h2', {}, 'Lifetime · tap a name for stats'));
     lifetimeLeaderboard(hist).forEach((r, i) => {
-      out.push(h('div', { class: 'lb-row' },
+      out.push(h('div', { class: 'lb-row tappable', role: 'button',
+        onclick: () => { state.statsPlayer = r.name; go('playerstats'); } },
         h('div', { class: 'phead' },
           h('span', { class: 'rank' }, `${i + 1}`),
           avatar(r.name, 30),
@@ -638,7 +752,7 @@ function viewHistory() {
           ),
         ),
         h('div', { class: 'btn-row' },
-          h('button', { class: 'sm', html: fx.icon('eye') + 'View', onclick: () => { state.shared = s; go('shared'); } }),
+          h('button', { class: 'sm', html: fx.icon('eye') + 'View', onclick: () => { state.shared = s; state.sharedId = s.id; go('shared'); } }),
           h('button', { class: 'sm', html: fx.icon('copy') + 'Link', onclick: () => copy(shareUrl(s)) }),
           h('button', { class: 'sm danger icon-only', 'aria-label': 'Delete game', html: fx.icon('trash'),
             onclick: () => { if (confirm('Delete this game?')) { deleteFromHistory(s.id); render(); } } }),
@@ -720,6 +834,7 @@ function boot() {
   const shared = sessionFromUrl();
   if (shared && shared.players.length) {
     state.shared = shared;
+    state.sharedId = null;
     setCurrency(shared.currency || 'INR');
     go('shared');
     return;

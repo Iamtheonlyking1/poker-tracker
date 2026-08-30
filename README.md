@@ -22,10 +22,20 @@ GitHub Pages. Installable as a phone app (works offline).
    tracks the difference between chips claimed and money bought in — aim for
    "Pot balanced" (it buzzes when you hit it).
 4. **Results** — net ±₹ per player (biggest winner gets a crown), session stats,
-   and a plain settlement list like `Rahul pays Ankit ₹1,200`. Buttons: **Share
-   to WhatsApp**, **Copy summary**, **Copy link**, **Save to history**.
-5. **History** — past games plus a lifetime profit/loss leaderboard (players
-   matched by name, case-insensitive).
+   and a settlement list like `Rahul pays Ankit ₹1,200`. **Tap a payment** to
+   mark it paid (`2/4 paid`); it persists, and you can re-open a saved game from
+   History to tick the rest off later. Buttons: **Share to WhatsApp**, **Copy
+   summary / link**, **Save to history**.
+5. **History** — past games plus a lifetime leaderboard; **tap any name** for
+   that player's stats (games, net, win rate, best/worst night, cumulative
+   trend).
+
+### Shared expense / kitty
+
+On the cash-out screen, **Add expense / kitty** — name it, pick who fronted the
+cash, tick which players chip in and set each one's amount (or **Split evenly**
+from a total). It folds into the settlement so it's still one minimal list of
+payments. Carried in share links.
 
 State autosaves to the browser on every change, so a refresh or phone lock
 won't lose the night. Everything lives in that one browser only — clearing site

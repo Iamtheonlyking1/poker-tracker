@@ -141,6 +141,18 @@ export function deleteFromHistory(id) {
   return hist;
 }
 
+/** Overwrite a saved game (e.g. after ticking off a payment later). */
+export function updateHistorySession(session) {
+  const hist = loadHistory();
+  const i = hist.findIndex((s) => s.id === session.id);
+  if (i < 0) return hist;
+  hist[i] = session;
+  try {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(hist));
+  } catch (e) {}
+  return hist;
+}
+
 // ---- cash-game session ledger (the "My Sessions" tool) ----
 
 const SESSIONLOG_KEY = 'poker.sessionlog';

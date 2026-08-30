@@ -618,6 +618,95 @@ label {
   color: var(--gold);
   font-weight: 700;
 }
+.settle-line.tappable {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+.settle-line.tappable:active {
+  transform: scale(0.99);
+}
+.settle-line .sl-check {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  color: var(--dim);
+}
+.settle-line.done {
+  opacity: 0.55;
+  border-left-color: var(--win);
+}
+.settle-line.done .sl-check {
+  color: var(--win);
+}
+.settle-line.done span {
+  text-decoration: line-through;
+  text-decoration-color: var(--dim);
+}
+.lb-row.tappable {
+  cursor: pointer;
+  border-radius: 10px;
+  margin: 0 -6px;
+  padding: 9px 6px;
+}
+.lb-row.tappable:active {
+  background: var(--surface-2);
+}
+
+/* ---------- kitty / shared expense ---------- */
+
+.kitty-card .row {
+  margin-bottom: 4px;
+}
+.kitty-rows {
+  margin-top: 10px;
+  border-top: 1px solid var(--border-soft);
+}
+.kitty-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border-soft);
+  margin: 0;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text);
+  font-size: 0.95rem;
+}
+.kitty-row input[type='checkbox'] {
+  width: 18px;
+  height: 18px;
+  min-height: 0;
+  flex: none;
+  accent-color: var(--gold);
+}
+.kitty-row .kr-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.kitty-row input.sm {
+  flex: none;
+  width: 96px;
+  text-align: right;
+}
+.kitty-foot {
+  margin-top: 10px;
+}
+.kitty-summary .kr-line {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border-soft);
+  font-size: 0.95rem;
+}
+.kitty-summary .kr-line:last-of-type {
+  border-bottom: 0;
+}
+.kitty-summary .pmeta {
+  margin-top: 6px;
+}
 
 /* ---------- bottom action bar ---------- */
 

@@ -823,8 +823,14 @@ export function viewRoster() {
                         : 'No games yet'),
                   ),
                 ),
-                h('button', { class: 'sm danger icon-only', 'aria-label': 'Remove ' + r.name, html: fx.icon('trash'),
-                  onclick: () => { if (confirm(`Remove ${r.name} from the roster?`)) { deleteRosterPlayer(r.id); render(); } } }),
+                h('div', { class: 'card-actions' },
+                  lt.games
+                    ? h('button', { class: 'sm ghost icon-only', 'aria-label': 'Stats for ' + r.name, html: fx.icon('graph'),
+                        onclick: () => { nav.state.statsPlayer = r.name; nav.go('playerstats'); } })
+                    : null,
+                  h('button', { class: 'sm danger icon-only', 'aria-label': 'Remove ' + r.name, html: fx.icon('trash'),
+                    onclick: () => { if (confirm(`Remove ${r.name} from the roster?`)) { deleteRosterPlayer(r.id); render(); } } }),
+                ),
               ),
               noteEl,
             );
@@ -855,6 +861,57 @@ export function viewRoster() {
     ),
     list,
     backbar(),
+  ];
+}
+
+// ---------- per-player home-game stats ----------
+
+export function viewPlayerStats(name) {
+  const key = (name || '').trim().toLowerCase();
+  const games = [];
+  for (const s of loadHistory()) {
+    for (const p of s.players || []) {
+      if (p.name.trim().toLowerCase() === key) games.push({ when: s.startedAt || 0, n: net(p) || 0 });
+    }
+  }
+  games.sort((a, b) => a.when - b.when);
+  const n = games.length;
+  const total = games.reduce((a, g) => a + g.n, 0);
+  const wins = games.filter((g) => g.n > 0).length;
+  const best = n ? Math.max(...games.map((g) => g.n)) : 0;
+  const worst = n ? Math.min(...games.map((g) => g.n)) : 0;
+  const avg = n ? Math.round(total / n) : 0;
+  const signed = (v) => (v >= 0 ? '+' : '−') + fmtMoney(Math.abs(v));
+
+  const chart = h('canvas', { class: 'chart', height: '150' });
+  if (n > 1) {
+    requestAnimationFrame(() => {
+      let run = 0;
+      drawLineChart(chart, games.map((g) => (run += g.n)), currencySymbol(currencyCode()));
+    });
+  }
+
+  return [
+    h('div', { class: 'tool-head' },
+      h('button', { class: 'sm ghost icon-only', 'aria-label': 'Back', html: fx.icon('back'), onclick: () => nav.go('history') }),
+      h('h1', {}, name || 'Player'),
+    ),
+    n
+      ? h('div', { class: 'card' },
+          h('div', { class: 'stat-grid' },
+            statBox(String(n), n === 1 ? 'Game' : 'Games'),
+            statBox(signed(total), 'Net', total >= 0 ? 'win' : 'loss'),
+            statBox(Math.round((wins / n) * 100) + '%', 'Win rate'),
+            statBox(signed(avg), 'Avg / game', avg >= 0 ? 'win' : 'loss'),
+            statBox(best > 0 ? '+' + fmtMoney(best) : fmtMoney(0), 'Best night', best > 0 ? 'win' : ''),
+            statBox(worst < 0 ? '−' + fmtMoney(-worst) : fmtMoney(0), 'Worst night', worst < 0 ? 'loss' : ''),
+          ),
+        )
+      : h('p', { class: 'muted empty' }, 'No saved games for this player yet.'),
+    n > 1 ? h('div', { class: 'card' }, h('div', { class: 'chart-lbl' }, 'Cumulative net'), chart) : null,
+    h('div', { class: 'actionbar' },
+      h('button', { class: 'ghost wide', html: fx.icon('back') + 'History', onclick: () => nav.go('history') }),
+    ),
   ];
 }
 
@@ -936,6 +993,7 @@ export const TOOL_VIEWS = {
   home: viewHome,
   roster: viewRoster,
   data: viewData,
+  playerstats: () => viewPlayerStats(nav.state.statsPlayer),
   bbcalc: viewBBCalc,
   ranges: viewRanges,
   action: viewAction,

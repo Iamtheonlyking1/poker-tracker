@@ -26,6 +26,33 @@ export function potOut(players) {
 }
 
 /**
+ * Turn `session.kitty` into `settle()` extras. Each contributor owes their share
+ * to whoever fronted the money (`paidBy`); the payer's own share nets out.
+ * kitty shape: { label, total, paidBy: playerId, entries: { [playerId]: amount } }
+ */
+export function kittyExtras(session) {
+  const k = session && session.kitty;
+  if (!k || !k.paidBy || !k.entries) return [];
+  const nameOf = (id) => (session.players.find((p) => p.id === id) || {}).name;
+  const payee = nameOf(k.paidBy);
+  if (!payee) return [];
+  const out = [];
+  for (const [pid, amt] of Object.entries(k.entries)) {
+    const amount = Math.round(Number(amt) || 0);
+    if (amount <= 0 || pid === k.paidBy) continue;
+    const from = nameOf(pid);
+    if (from) out.push({ from, to: payee, amount });
+  }
+  return out;
+}
+
+export function kittyTotal(session) {
+  const k = session && session.kitty;
+  if (!k || !k.entries) return 0;
+  return Object.values(k.entries).reduce((s, a) => s + (Math.round(Number(a) || 0)), 0);
+}
+
+/**
  * Pot reconciliation. delta > 0 means players claimed MORE than was bought in
  * (phantom chips); delta < 0 means chips went missing.
  */
@@ -39,20 +66,29 @@ export function reconciliation(players) {
 /**
  * Compute who pays whom.
  * Input: players with numeric cashOut set.
+ * `extras` — extra debts to fold in before matching, e.g. a shared kitty:
+ *   [{ from, to, amount }]  (from owes `amount` to `to`).
  * Output: [{ from, to, amount }] sorted by amount desc, amounts are positive ints.
  *
- * Strategy: exact-opposite pairs first (keeps the list readable), then greedy
- * largest-debtor / largest-creditor matching. Produces <= n-1 transfers.
+ * Strategy: net every player (game result ± extras) into a name→balance map,
+ * then exact-opposite pairs first (keeps the list readable), then greedy
+ * largest-debtor / largest-creditor matching. Produces one minimal combined list.
  */
-export function settle(players) {
-  const balances = players
-    .map((p) => ({ name: p.name, amount: net(p) || 0 }))
-    .filter((b) => b.amount !== 0);
+export function settle(players, extras = []) {
+  const bal = {};
+  for (const p of players) bal[p.name] = (bal[p.name] || 0) + (net(p) || 0);
+  for (const e of extras || []) {
+    if (!e || !(e.amount > 0) || e.from === e.to) continue;
+    bal[e.from] = (bal[e.from] || 0) - e.amount;
+    bal[e.to] = (bal[e.to] || 0) + e.amount;
+  }
 
-  let creditors = balances.filter((b) => b.amount > 0).map((b) => ({ ...b }));
-  let debtors = balances
-    .filter((b) => b.amount < 0)
-    .map((b) => ({ name: b.name, amount: -b.amount }));
+  let creditors = [];
+  let debtors = [];
+  for (const [name, amount] of Object.entries(bal)) {
+    if (amount > 0) creditors.push({ name, amount });
+    else if (amount < 0) debtors.push({ name, amount: -amount });
+  }
 
   const transfers = [];
 
