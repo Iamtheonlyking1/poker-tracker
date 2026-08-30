@@ -14,6 +14,8 @@ import {
   deleteFromHistory,
   loadCurrencyPref,
   saveCurrencyPref,
+  loadRoster,
+  noteFor,
   pushUndo,
   popUndo,
   canUndo,
@@ -199,16 +201,36 @@ function viewSetup() {
   };
   renderList();
 
+  const addPending = (name) => {
+    const clean = name.trim();
+    if (!clean || pending.some((p) => p.toLowerCase() === clean.toLowerCase())) return;
+    pending.push(clean);
+    renderList();
+    renderRoster();
+  };
   const playerIn = h('input', {
     type: 'text', placeholder: 'Add player name, press Enter', enterkeyhint: 'done', autocomplete: 'off',
     onkeydown: (e) => {
       if (e.key === 'Enter' && playerIn.value.trim()) {
-        pending.push(playerIn.value.trim());
+        addPending(playerIn.value);
         playerIn.value = '';
-        renderList();
       }
     },
   });
+
+  // one-tap chips from the saved roster
+  const rosterRow = h('div', { class: 'chips roster-chips' });
+  const renderRoster = () => {
+    const avail = loadRoster().filter((r) => !pending.some((p) => p.toLowerCase() === r.name.toLowerCase()));
+    rosterRow.replaceChildren(
+      ...avail.map((r) =>
+        h('button', { class: 'chip', html: fx.icon('plus') + escapeHtml(r.name), onclick: () => addPending(r.name) }),
+      ),
+    );
+    rosterRow.hidden = avail.length === 0;
+    fx.attachRipples(rosterRow);
+  };
+  renderRoster();
 
   const start = h('button', {
     class: 'primary wide', html: 'Deal me in' + fx.icon('forward'),
@@ -242,6 +264,7 @@ function viewSetup() {
     customIn,
     h('h2', {}, 'Players'),
     playerIn,
+    rosterRow,
     list,
     h('div', { style: 'height:16px' }),
     start,
@@ -295,6 +318,7 @@ function viewLive() {
     };
     custom.addEventListener('keydown', (e) => { if (e.key === 'Enter') addCustom(e); });
 
+    const note = noteFor(p.name);
     return h('div', { class: 'card' },
       h('div', { class: 'row' },
         h('div', { class: 'phead' },
@@ -302,6 +326,7 @@ function viewLive() {
           h('div', { class: 'pinfo' },
             nameEl,
             h('div', { class: 'pmeta' }, `In ${fmtMoney(totalIn(p))} · ${p.buyIns.length} buy-in${p.buyIns.length === 1 ? '' : 's'}`),
+            note ? h('div', { class: 'pnote', html: fx.icon('edit') + escapeHtml(note) }) : null,
           ),
         ),
         h('div', { class: 'card-actions' },
@@ -477,6 +502,7 @@ function resultsBlock(s, { animate = false } = {}) {
   out.push(h('h2', {}, 'Net'));
   const netCards = rows.map((r, i) => {
     const winner = i === 0 && r.n > 0;
+    const nt = noteFor(r.name);
     return h('div', { class: 'card' + (winner ? ' winner' : '') },
       h('div', { class: 'row' },
         h('div', { class: 'phead' },
@@ -484,6 +510,7 @@ function resultsBlock(s, { animate = false } = {}) {
           h('div', { class: 'pinfo' },
             h('div', { class: 'pname' }, winner ? h('span', { class: 'crown', html: fx.icon('crown') }) : null, r.name),
             winner ? h('div', { class: 'pmeta' }, 'Biggest winner') : null,
+            nt ? h('div', { class: 'pnote', html: fx.icon('edit') + escapeHtml(nt) }) : null,
           ),
         ),
         animate ? netCount(r.n) : fmtNet(r.n),

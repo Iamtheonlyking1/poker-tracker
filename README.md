@@ -54,6 +54,12 @@ here.
 - **Study** — bet sizing, blockers, MDF/alpha and other concepts
 - **My Sessions** — a personal cash-game log ($/hr, ROI, P&L charts) in the
   currency you picked for the game
+- **Players** — a saved roster of regulars with a private per-player note
+  ("overfolds to 3-bets"). Saved players appear as one-tap chips on the setup
+  screen; the note shows on their card during the game.
+- **Data** — download a backup of everything (history, sessions, roster,
+  settings) to a JSON file, and restore it — replace or merge. The only way to
+  move your data to a new phone or recover it after a browser wipe.
 
 Old `ptk_sessions` / `ptk_quiz` localStorage data from the standalone toolkit is
 migrated on first load.

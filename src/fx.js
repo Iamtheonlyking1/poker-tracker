@@ -45,6 +45,10 @@ const P = {
   ledger: '<path d="M6 3h11l3 3v15H6z"/><path d="M9 8h8M9 12h8M9 16h5"/>',
   graph: '<path d="M4 19V5M4 19h16"/><path d="M8 15l3-4 3 2 4-6"/>',
   scale: '<path d="M12 3v18M6 21h12M4 8l4-4 4 4M4 8a4 4 0 0 0 8 0M12 8l4-4 4 4M12 8a4 4 0 0 0 8 0"/>',
+  download: '<path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M4 20h16"/>',
+  upload: '<path d="M12 21V9"/><path d="M7 13l5-5 5 5"/><path d="M4 4h16"/>',
+  database:
+    '<ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6"/><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/>',
 };
 
 export function icon(name, cls = '') {

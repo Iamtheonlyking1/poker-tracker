@@ -191,6 +191,38 @@ p {
   color: var(--muted);
   font-size: 0.86rem;
 }
+.pnote {
+  margin-top: 3px;
+  color: var(--gold);
+  font-size: 0.8rem;
+  font-style: italic;
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  line-height: 1.35;
+}
+.pnote .ic {
+  width: 12px;
+  height: 12px;
+  flex: none;
+  margin-top: 3px;
+  opacity: 0.8;
+}
+.roster-chips {
+  margin-top: 8px;
+}
+.roster-chips .chip {
+  min-height: 40px;
+  padding: 0 12px 0 10px;
+  gap: 4px;
+  font-weight: 550;
+  font-size: 0.9rem;
+}
+.roster-chips .chip .ic {
+  width: 14px;
+  height: 14px;
+  color: var(--gold);
+}
 .net-win {
   color: var(--win);
   font-weight: 750;

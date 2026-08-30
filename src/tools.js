@@ -1,9 +1,9 @@
 // The poker study tools, rebuilt as native views in the felt/gold theme.
 // Each exported view returns a node array, same shape as app.js's game views.
 
-import { h } from './ui.js';
+import { h, avatar } from './ui.js';
 import * as fx from './fx.js';
-import { currencySymbol, currencyCode } from './money.js';
+import { fmtMoney, currencySymbol, currencyCode } from './money.js';
 import * as poker from './poker.js';
 import { drawLineChart, drawBarChart } from './charts.js';
 import {
@@ -13,7 +13,12 @@ import {
   deleteSessionLog,
   loadQuizScore,
   saveQuizScore,
+  loadRoster,
+  upsertRosterPlayer,
+  deleteRosterPlayer,
 } from './state.js';
+import { net } from './settle.js';
+import { exportBlob, importAll, summarize, markExported } from './backup.js';
 
 // ---------- controller hook (set once by app.js to avoid a circular import) ----------
 
@@ -63,6 +68,7 @@ const notesList = (items) =>
 // ---------- Home hub ----------
 
 const TILES = [
+  ['roster', 'users', 'Players', 'Saved regulars & notes'],
   ['bbcalc', 'calc', 'BB Calc', 'Stack in big blinds'],
   ['ranges', 'grid', 'Ranges', 'Opening charts by seat'],
   ['action', 'target', 'Action', 'Preflop advisor'],
@@ -71,6 +77,7 @@ const TILES = [
   ['equity', 'graph', 'Equity', 'Hand vs range'],
   ['study', 'book', 'Study', 'Sizing, blockers, theory'],
   ['sessions', 'ledger', 'My Sessions', 'Personal cash-game log'],
+  ['data', 'database', 'Data', 'Back up & restore'],
 ];
 
 export function viewHome() {
@@ -772,10 +779,163 @@ export function viewSessions() {
   ];
 }
 
+// ---------- Players roster ----------
+
+function rosterLifetime(name) {
+  const key = name.trim().toLowerCase();
+  let games = 0;
+  let total = 0;
+  for (const s of loadHistory()) {
+    for (const p of s.players || []) {
+      if (p.name.trim().toLowerCase() === key) {
+        games += 1;
+        total += net(p) || 0;
+      }
+    }
+  }
+  return { games, total };
+}
+
+export function viewRoster() {
+  let roster = loadRoster();
+  const list = h('div', {});
+
+  const render = () => {
+    roster = loadRoster();
+    list.replaceChildren(
+      ...(roster.length
+        ? roster.map((r) => {
+            const lt = rosterLifetime(r.name);
+            const noteEl = h('input', {
+              type: 'text', value: r.note || '', placeholder: 'Private note — reads, leaks…',
+              'aria-label': 'Note for ' + r.name,
+              onchange: () => upsertRosterPlayer({ id: r.id, name: r.name, note: noteEl.value }),
+            });
+            return h('div', { class: 'card' },
+              h('div', { class: 'row' },
+                h('div', { class: 'phead' },
+                  avatar(r.name),
+                  h('div', { class: 'pinfo' },
+                    h('div', { class: 'pname' }, r.name),
+                    h('div', { class: 'pmeta' },
+                      lt.games
+                        ? `${lt.games} game${lt.games === 1 ? '' : 's'} · ${lt.total >= 0 ? '+' : '−'}${fmtMoney(Math.abs(lt.total))} lifetime`
+                        : 'No games yet'),
+                  ),
+                ),
+                h('button', { class: 'sm danger icon-only', 'aria-label': 'Remove ' + r.name, html: fx.icon('trash'),
+                  onclick: () => { if (confirm(`Remove ${r.name} from the roster?`)) { deleteRosterPlayer(r.id); render(); } } }),
+              ),
+              noteEl,
+            );
+          })
+        : [h('p', { class: 'muted empty' }, 'No saved players yet. Add your regulars below.')]),
+    );
+  };
+  render();
+
+  const addIn = h('input', {
+    type: 'text', placeholder: 'Player name, press Enter', enterkeyhint: 'done', autocomplete: 'off',
+    onkeydown: (e) => {
+      if (e.key === 'Enter' && addIn.value.trim()) {
+        upsertRosterPlayer({ name: addIn.value.trim() });
+        addIn.value = '';
+        render();
+        fx.haptic(10);
+      }
+    },
+  });
+
+  return [
+    toolHead('Players'),
+    h('div', { class: 'card' },
+      h('h2', {}, 'Add a regular'),
+      addIn,
+      h('p', { class: 'muted small' }, 'Saved players show up as one-tap chips when you start a game. Notes stay on this device only.'),
+    ),
+    list,
+    backbar(),
+  ];
+}
+
+// ---------- Data (backup / restore) ----------
+
+export function viewData() {
+  const status = h('p', { class: 'muted' });
+  const setStatus = () => {
+    const s = summarize();
+    const ago = s.lastExportAt
+      ? (() => {
+          const d = Math.floor((Date.now() - s.lastExportAt) / 86400000);
+          return d <= 0 ? 'today' : d === 1 ? 'yesterday' : `${d} days ago`;
+        })()
+      : 'never';
+    status.textContent = `${s.games} game${s.games === 1 ? '' : 's'} · ${s.sessions} session${s.sessions === 1 ? '' : 's'} · ${s.roster} roster · last backup ${ago}`;
+  };
+  setStatus();
+
+  const doExport = () => {
+    try {
+      const blob = exportBlob();
+      const url = URL.createObjectURL(blob);
+      const a = h('a', { href: url, download: `poker-night-${new Date().toISOString().slice(0, 10)}.json` });
+      document.body.append(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      markExported();
+      setStatus();
+      nav.toast('Backup downloaded');
+    } catch (e) {
+      nav.toast('Export failed');
+    }
+  };
+
+  const fileIn = h('input', { type: 'file', accept: 'application/json,.json', hidden: 'true' });
+  fileIn.addEventListener('change', () => {
+    const file = fileIn.files && fileIn.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      let obj;
+      try { obj = JSON.parse(reader.result); } catch (e) { nav.toast('Not a valid file'); return; }
+      const mode = confirm('Replace everything with this backup?\n\nOK = replace all\nCancel = merge (keep both)')
+        ? 'replace'
+        : 'merge';
+      const res = importAll(obj, { mode });
+      if (!res.ok) { nav.toast(res.error || 'Import failed'); return; }
+      nav.toast(`Restored — ${res.summary.games} games, ${res.summary.sessions} sessions`);
+      fx.haptic([12, 40, 12]);
+      nav.go('home');
+    };
+    reader.readAsText(file);
+    fileIn.value = '';
+  });
+
+  return [
+    toolHead('Data'),
+    h('div', { class: 'card' },
+      h('h2', {}, 'Backup'),
+      status,
+      h('p', { class: 'muted small' }, 'Everything lives in this browser only. Download a backup file now and again — restoring it moves your history to a new phone or brings it back after a wipe.'),
+      h('button', { class: 'primary wide', html: fx.icon('download') + 'Download backup', onclick: doExport }),
+    ),
+    h('div', { class: 'card' },
+      h('h2', {}, 'Restore'),
+      h('p', { class: 'muted small' }, 'Load a backup file. You choose replace (wipe and load) or merge (keep both sets, de-duped).'),
+      h('button', { class: 'ghost wide', html: fx.icon('upload') + 'Restore from file', onclick: () => fileIn.click() }),
+      fileIn,
+    ),
+    backbar(),
+  ];
+}
+
 // ---------- registry ----------
 
 export const TOOL_VIEWS = {
   home: viewHome,
+  roster: viewRoster,
+  data: viewData,
   bbcalc: viewBBCalc,
   ranges: viewRanges,
   action: viewAction,

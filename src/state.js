@@ -3,7 +3,18 @@
 const ACTIVE_KEY = 'poker.active';
 const HISTORY_KEY = 'poker.history';
 const CURRENCY_KEY = 'poker.currency';
+const ROSTER_KEY = 'poker.roster';
 const UNDO_LIMIT = 20;
+
+// Every persisted key, for backup/export. Keep this in sync when adding stores.
+export const STORE_KEYS = [
+  'poker.active',
+  'poker.history',
+  'poker.currency',
+  'poker.roster',
+  'poker.sessionlog',
+  'poker.quiz',
+];
 
 let undoStack = [];
 
@@ -183,6 +194,60 @@ export function loadQuizScore() {
 
 export function saveQuizScore(score) {
   writeJSON(QUIZ_KEY, score);
+}
+
+// ---- player roster (saved regulars + private notes) ----
+
+export function loadRoster() {
+  return readJSON(ROSTER_KEY, []);
+}
+
+export function upsertRosterPlayer({ id, name, note }) {
+  const list = loadRoster();
+  const clean = (name || '').trim();
+  if (!clean) return list;
+  const existing = id
+    ? list.find((r) => r.id === id)
+    : list.find((r) => r.name.toLowerCase() === clean.toLowerCase());
+  if (existing) {
+    existing.name = clean;
+    if (note !== undefined) existing.note = note;
+  } else {
+    list.push({ id: uid(), name: clean, note: note || '' });
+  }
+  list.sort((a, b) => a.name.localeCompare(b.name));
+  writeJSON(ROSTER_KEY, list);
+  return list;
+}
+
+export function deleteRosterPlayer(id) {
+  const list = loadRoster().filter((r) => r.id !== id);
+  writeJSON(ROSTER_KEY, list);
+  return list;
+}
+
+/** note for a player name, or '' — used to surface notes during a game. */
+export function noteFor(name) {
+  const clean = (name || '').trim().toLowerCase();
+  const hit = loadRoster().find((r) => r.name.toLowerCase() === clean);
+  return hit ? hit.note || '' : '';
+}
+
+// ---- raw store access (for backup / import) ----
+
+export function rawGet(key) {
+  try {
+    return localStorage.getItem(key);
+  } catch (e) {
+    return null;
+  }
+}
+
+export function rawSet(key, value) {
+  try {
+    if (value == null) localStorage.removeItem(key);
+    else localStorage.setItem(key, value);
+  } catch (e) {}
 }
 
 // ---- undo ----
