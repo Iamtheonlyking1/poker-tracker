@@ -2,12 +2,7 @@
 // window.location / btoa / atob (all present in browsers).
 
 import { net, settle, reconciliation, totalIn } from './settle.js';
-
-export const rupee = new Intl.NumberFormat('en-IN', {
-  style: 'currency',
-  currency: 'INR',
-  maximumFractionDigits: 0,
-});
+import { fmtMoney, setCurrency } from './money.js';
 
 // Compact serialization: short keys, drop buy-in timestamps.
 function pack(session) {
@@ -15,6 +10,7 @@ function pack(session) {
     n: session.name,
     b: session.defaultBuyIn,
     t: session.startedAt,
+    c: session.currency || 'INR',
     p: session.players.map((p) => ({
       n: p.name,
       i: p.buyIns.map((x) => x.amount),
@@ -29,6 +25,7 @@ function unpack(o) {
     name: o.n,
     defaultBuyIn: o.b,
     startedAt: o.t,
+    currency: o.c || 'INR',
     status: 'settled',
     players: (o.p || []).map((p) => ({
       id: Math.random().toString(36).slice(2, 9),
@@ -78,6 +75,7 @@ export function sessionFromUrl() {
 
 /** Plain-text results summary, WhatsApp-friendly. */
 export function summaryText(session, { withLink = true } = {}) {
+  setCurrency(session.currency || 'INR');
   const lines = [];
   lines.push(`\u{1F0CF} ${session.name}`);
   const d = new Date(session.startedAt);
@@ -91,14 +89,14 @@ export function summaryText(session, { withLink = true } = {}) {
   lines.push('*Results*');
   for (const r of rows) {
     const sign = r.net > 0 ? '+' : r.net < 0 ? '-' : '';
-    lines.push(`${r.name}: ${sign}${rupee.format(Math.abs(r.net))}`);
+    lines.push(`${r.name}: ${sign}${fmtMoney(Math.abs(r.net))}`);
   }
 
   const rec = reconciliation(session.players);
   if (!rec.balanced) {
     const word = rec.delta > 0 ? 'extra' : 'missing';
     lines.push('');
-    lines.push(`⚠️ Pot off by ${rupee.format(Math.abs(rec.delta))} (${word})`);
+    lines.push(`⚠️ Pot off by ${fmtMoney(Math.abs(rec.delta))} (${word})`);
   }
 
   const transfers = settle(session.players);
@@ -108,7 +106,7 @@ export function summaryText(session, { withLink = true } = {}) {
     lines.push('Everyone square. Nothing to pay.');
   } else {
     for (const t of transfers) {
-      lines.push(`${t.from} pays ${t.to} ${rupee.format(t.amount)}`);
+      lines.push(`${t.from} pays ${t.to} ${fmtMoney(t.amount)}`);
     }
   }
 

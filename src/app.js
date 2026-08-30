@@ -12,12 +12,15 @@ import {
   loadHistory,
   saveToHistory,
   deleteFromHistory,
+  loadCurrencyPref,
+  saveCurrencyPref,
   pushUndo,
   popUndo,
   canUndo,
 } from './state.js';
 import { net, totalIn, potIn, settle, reconciliation } from './settle.js';
-import { rupee, summaryText, shareUrl, whatsappUrl, sessionFromUrl } from './share.js';
+import { summaryText, shareUrl, whatsappUrl, sessionFromUrl } from './share.js';
+import { fmtMoney, setCurrency, currencyName, currencySymbol, allCurrencies } from './money.js';
 import { h, escapeHtml, fmtNet, netCount, avatar, fmtDuration } from './ui.js';
 import * as fx from './fx.js';
 
@@ -83,11 +86,80 @@ function elapsedPill(s) {
   });
 }
 
+// bottom-sheet currency picker with search
+function openCurrencyPicker(currentCode, onPick) {
+  const all = allCurrencies();
+  const rows = h('div', { class: 'sheet-list' });
+  const search = h('input', {
+    type: 'search', placeholder: 'Search currency or code', 'aria-label': 'Search currency',
+    autocomplete: 'off', enterkeyhint: 'search',
+  });
+
+  const paint = (q) => {
+    const term = q.trim().toLowerCase();
+    const list = term
+      ? all.filter((c) => c.code.toLowerCase().includes(term) || c.name.toLowerCase().includes(term))
+      : all;
+    const items = list.slice(0, 400).map((c) =>
+      h('button', {
+        class: 'currency-row' + (c.code === currentCode ? ' on' : ''),
+        onclick: () => { close(); onPick(c.code); },
+      },
+        h('span', { class: 'cur-sym' }, c.symbol),
+        h('span', { class: 'cur-name' }, c.name),
+        h('span', { class: 'cur-code' }, c.code),
+      ),
+    );
+    if (!list.length) items.push(h('p', { class: 'muted empty' }, 'No currency matches that.'));
+    rows.replaceChildren(...items);
+  };
+  search.addEventListener('input', () => paint(search.value));
+
+  const sheet = h('div', { class: 'sheet', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Choose currency' },
+    h('div', { class: 'sheet-head' },
+      h('b', {}, 'Currency'),
+      h('button', { class: 'sm ghost icon-only', 'aria-label': 'Close', html: fx.icon('close'), onclick: () => close() }),
+    ),
+    search,
+    rows,
+  );
+  const wrap = h('div', { class: 'sheet-wrap' },
+    h('div', { class: 'sheet-backdrop', onclick: () => close() }),
+    sheet,
+  );
+  const onKey = (e) => { if (e.key === 'Escape') close(); };
+  function close() {
+    document.removeEventListener('keydown', onKey);
+    wrap.classList.add('closing');
+    setTimeout(() => wrap.remove(), 200);
+  }
+  document.addEventListener('keydown', onKey);
+  document.body.append(wrap);
+  paint('');
+  setTimeout(() => search.focus(), 60);
+}
+
 // ---------- setup ----------
 
 function viewSetup() {
   const nameIn = h('input', { type: 'text', placeholder: 'Friday game', value: 'Poker night', enterkeyhint: 'done', autocomplete: 'off' });
   let buyIn = 500;
+  let currency = loadCurrencyPref();
+  setCurrency(currency);
+
+  const curBtn = h('button', { class: 'ghost wide field-btn', onclick: () => {
+    openCurrencyPicker(currency, (code) => {
+      currency = code;
+      setCurrency(code);
+      curBtn.innerHTML = curBtnLabel();
+      renderChips();
+      customIn.setAttribute('placeholder', 'Custom amount');
+    });
+  } });
+  const curBtnLabel = () =>
+    `<span class="cur-sym">${currencySymbol(currency)}</span><span class="cur-name">${currencyName(currency)}</span>` +
+    `<span class="cur-code">${currency}</span>${fx.icon('forward')}`;
+  curBtn.innerHTML = curBtnLabel();
 
   const chipRow = h('div', { class: 'chips' });
   const renderChips = () => {
@@ -96,7 +168,7 @@ function viewSetup() {
         h('button', {
           class: 'chip' + (v === buyIn ? ' on' : ''),
           onclick: () => { buyIn = v; customIn.value = ''; renderChips(); },
-        }, rupee.format(v)),
+        }, fmtMoney(v)),
       ),
     );
     fx.attachRipples(chipRow);
@@ -140,11 +212,12 @@ function viewSetup() {
     class: 'primary wide', html: 'Deal me in' + fx.icon('forward'),
     onclick: () => {
       if (pending.length < 2) return toast('Add at least 2 players');
-      const s = newSession({ name: nameIn.value, defaultBuyIn: buyIn });
+      const s = newSession({ name: nameIn.value, defaultBuyIn: buyIn, currency });
       pending.forEach((n) => addPlayer(s, n));
       s.players.forEach((p) => addBuyIn(s, p.id, s.defaultBuyIn));
       state.session = s;
       clearActive();
+      saveCurrencyPref(currency);
       save(s);
       fx.haptic(15);
       go('live');
@@ -153,13 +226,15 @@ function viewSetup() {
 
   return [
     h('h1', { html: fx.icon('spade') + 'Poker Night' }),
-    h('p', { class: 'muted' }, 'Track buy-ins in ₹, settle up clean at the end.'),
+    h('p', { class: 'muted' }, 'Track buy-ins, settle up clean at the end.'),
     loadHistory().length
       ? h('button', { class: 'ghost wide', html: fx.icon('trophy') + `History (${loadHistory().length})`, onclick: () => go('history') })
       : null,
     h('h2', {}, 'Session'),
     h('label', {}, 'Name'),
     nameIn,
+    h('label', {}, 'Currency'),
+    curBtn,
     h('label', {}, 'Default buy-in'),
     chipRow,
     customIn,
@@ -177,9 +252,9 @@ function topbar(session) {
   const pot = potIn(session.players);
   const n = session.players.length;
   return h('div', { class: 'topbar' },
-    h('div', { class: 'stat' }, h('b', { id: 'pot-amt', class: 'gold' }, rupee.format(pot)), 'in the pot'),
+    h('div', { class: 'stat' }, h('b', { id: 'pot-amt', class: 'gold' }, fmtMoney(pot)), 'in the pot'),
     h('div', { class: 'stat' }, h('b', {}, String(n)), n === 1 ? 'player' : 'players'),
-    h('div', { class: 'stat' }, h('b', {}, rupee.format(n ? Math.round(pot / n) : 0)), 'avg stack'),
+    h('div', { class: 'stat' }, h('b', {}, fmtMoney(n ? Math.round(pot / n) : 0)), 'avg stack'),
   );
 }
 
@@ -187,7 +262,7 @@ function viewLive() {
   const s = state.session;
 
   const bump = (rect, amount) => {
-    fx.floatUp(rect, '+' + rupee.format(amount));
+    fx.floatUp(rect, '+' + fmtMoney(amount));
     fx.pop(document.getElementById('pot-amt'));
     fx.haptic(10);
   };
@@ -208,7 +283,7 @@ function viewLive() {
       inp.select();
     };
 
-    const custom = h('input', { type: 'number', inputmode: 'numeric', placeholder: 'Custom ₹', enterkeyhint: 'done' });
+    const custom = h('input', { type: 'number', inputmode: 'numeric', placeholder: 'Custom ' + currencySymbol(s.currency), enterkeyhint: 'done' });
     const addCustom = (e) => {
       const v = parseInt(custom.value, 10);
       if (!(v > 0)) return;
@@ -224,7 +299,7 @@ function viewLive() {
           avatar(p.name),
           h('div', { class: 'pinfo' },
             nameEl,
-            h('div', { class: 'pmeta' }, `In ${rupee.format(totalIn(p))} · ${p.buyIns.length} buy-in${p.buyIns.length === 1 ? '' : 's'}`),
+            h('div', { class: 'pmeta' }, `In ${fmtMoney(totalIn(p))} · ${p.buyIns.length} buy-in${p.buyIns.length === 1 ? '' : 's'}`),
           ),
         ),
         h('div', { class: 'card-actions' },
@@ -235,7 +310,7 @@ function viewLive() {
       ),
       h('div', { class: 'btn-row' },
         h('button', {
-          class: 'primary', html: fx.icon('plus') + rupee.format(s.defaultBuyIn),
+          class: 'primary', html: fx.icon('plus') + fmtMoney(s.defaultBuyIn),
           onclick: (e) => {
             const rect = e.currentTarget.getBoundingClientRect();
             mutate((ss) => addBuyIn(ss, p.id, ss.defaultBuyIn));
@@ -266,14 +341,14 @@ function viewLive() {
     topbar(s),
     h('div', { class: 'subbar' },
       h('button', {
-        class: 'sm ghost wide', html: fx.icon('users') + `Round for everyone · ${rupee.format(s.defaultBuyIn)}`,
+        class: 'sm ghost wide', html: fx.icon('users') + `Round for everyone · ${fmtMoney(s.defaultBuyIn)}`,
         onclick: () => {
           if (!s.players.length) return;
-          if (!confirm(`Add a ${rupee.format(s.defaultBuyIn)} buy-in for all ${s.players.length} players?`)) return;
+          if (!confirm(`Add a ${fmtMoney(s.defaultBuyIn)} buy-in for all ${s.players.length} players?`)) return;
           mutate((ss) => rebuyAll(ss));
           fx.haptic([12, 30, 12]);
           fx.pop(document.getElementById('pot-amt'));
-          toast(`Round added · ${rupee.format(s.defaultBuyIn * s.players.length)}`);
+          toast(`Round added · ${fmtMoney(s.defaultBuyIn * s.players.length)}`);
         },
       }),
     ),
@@ -299,7 +374,7 @@ function viewCashout() {
     const rec = reconciliation(s.players);
     if (rec.balanced) {
       banner.className = 'banner ok';
-      banner.innerHTML = fx.icon('check') + `Pot balanced at ${rupee.format(rec.in)}`;
+      banner.innerHTML = fx.icon('check') + `Pot balanced at ${fmtMoney(rec.in)}`;
       if (!wasBalanced) {
         banner.classList.add('flash');
         setTimeout(() => banner.classList.remove('flash'), 800);
@@ -309,8 +384,8 @@ function viewCashout() {
       banner.className = 'banner warn';
       banner.textContent =
         rec.delta > 0
-          ? `${rupee.format(rec.delta)} more than bought in — recount stacks`
-          : `${rupee.format(-rec.delta)} unaccounted — recount stacks`;
+          ? `${fmtMoney(rec.delta)} more than bought in — recount stacks`
+          : `${fmtMoney(-rec.delta)} unaccounted — recount stacks`;
     }
     wasBalanced = rec.balanced;
     const allIn = s.players.every((p) => p.cashOut !== null && p.cashOut !== undefined);
@@ -321,7 +396,7 @@ function viewCashout() {
   const cards = s.players.map((p) => {
     let netSpan = fmtNet(net(p));
     const inp = h('input', {
-      type: 'number', inputmode: 'numeric', placeholder: 'Ending stack ₹', enterkeyhint: 'done', value: p.cashOut ?? '',
+      type: 'number', inputmode: 'numeric', placeholder: 'Ending stack', enterkeyhint: 'done', value: p.cashOut ?? '',
       oninput: () => {
         const v = inp.value === '' ? null : parseInt(inp.value, 10);
         setCashOut(s, p.id, Number.isNaN(v) ? null : v);
@@ -338,7 +413,7 @@ function viewCashout() {
           avatar(p.name),
           h('div', { class: 'pinfo' },
             h('div', { class: 'pname' }, p.name),
-            h('div', { class: 'pmeta' }, `In ${rupee.format(totalIn(p))}`),
+            h('div', { class: 'pmeta' }, `In ${fmtMoney(totalIn(p))}`),
           ),
         ),
         netSpan,
@@ -373,7 +448,7 @@ function resultsBlock(s, { animate = false } = {}) {
     h('div', { class: 'statstrip' },
       h('span', {}, new Date(s.startedAt).toLocaleDateString('en-IN', { dateStyle: 'medium' })),
       h('span', {}, `${s.players.length} players`),
-      h('span', {}, `${rupee.format(potIn(s.players))} in play`),
+      h('span', {}, `${fmtMoney(potIn(s.players))} in play`),
       h('span', { html: fx.icon('clock') + fmtDuration(durMs) }),
     ),
   ];
@@ -381,8 +456,8 @@ function resultsBlock(s, { animate = false } = {}) {
   if (!rec.balanced) {
     out.push(h('div', { class: 'banner warn' },
       rec.delta > 0
-        ? `Heads up: stacks add up to ${rupee.format(rec.delta)} more than the pot.`
-        : `Heads up: ${rupee.format(-rec.delta)} missing from the pot.`));
+        ? `Heads up: stacks add up to ${fmtMoney(rec.delta)} more than the pot.`
+        : `Heads up: ${fmtMoney(-rec.delta)} missing from the pot.`));
   }
 
   out.push(h('h2', {}, 'Net'));
@@ -409,7 +484,7 @@ function resultsBlock(s, { animate = false } = {}) {
   } else {
     for (const t of transfers) {
       out.push(h('div', { class: 'settle-line',
-        html: `<b>${escapeHtml(t.from)}</b> pays <b>${escapeHtml(t.to)}</b> ${rupee.format(t.amount)}` }));
+        html: `<b>${escapeHtml(t.from)}</b> pays <b>${escapeHtml(t.to)}</b> ${fmtMoney(t.amount)}` }));
     }
   }
   return out;
@@ -518,7 +593,7 @@ function viewHistory() {
         h('div', { class: 'hist-item' },
           h('div', {},
             h('div', { class: 'pname' }, s.name),
-            h('div', { class: 'pmeta' }, `${new Date(s.startedAt).toLocaleDateString('en-IN', { dateStyle: 'medium' })} · ${s.players.length} players · pot ${rupee.format(potIn(s.players))}`),
+            h('div', { class: 'pmeta' }, `${new Date(s.startedAt).toLocaleDateString('en-IN', { dateStyle: 'medium' })} · ${s.players.length} players · pot ${fmtMoney(potIn(s.players))}`),
           ),
         ),
         h('div', { class: 'btn-row' },
@@ -591,7 +666,7 @@ function afterResults() {
   app.querySelectorAll('[data-count]').forEach((el) => {
     const to = Number(el.dataset.count);
     const sign = to > 0 ? '+' : '−';
-    fx.countUp(el, Math.abs(to), (v) => sign + rupee.format(Math.round(v)));
+    fx.countUp(el, Math.abs(to), (v) => sign + fmtMoney(Math.round(v)));
   });
 }
 
@@ -601,16 +676,19 @@ function boot() {
   const shared = sessionFromUrl();
   if (shared && shared.players.length) {
     state.shared = shared;
+    setCurrency(shared.currency || 'INR');
     go('shared');
     return;
   }
   const active = loadActive();
   if (active && active.players.length) {
     state.session = active;
+    setCurrency(active.currency || 'INR');
     const anyCashOut = active.players.some((p) => p.cashOut != null);
     go(anyCashOut ? 'cashout' : 'live');
     return;
   }
+  setCurrency(loadCurrencyPref());
   go('setup');
 }
 

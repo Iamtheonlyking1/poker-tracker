@@ -9,8 +9,10 @@ GitHub Pages. Installable as a phone app (works offline).
 
 ## Use it
 
-1. **Setup** — name the session, pick a default buy-in (₹100 / 200 / 500 / 1000
-   or custom), add players. Everyone starts with one buy-in.
+1. **Setup** — name the session, pick a **currency** (defaults to ₹ INR; the
+   picker searches every ISO-4217 currency by name or code and remembers your
+   last choice), set a default buy-in, add players. Everyone starts with one
+   buy-in.
 2. **Live** — tap `+ ₹500` for a rebuy or enter a custom amount. **Round for
    everyone** adds one buy-in to every player at once. Tap the pencil to rename a
    player, add a late arrival any time. Sticky header shows pot / players / avg
@@ -63,7 +65,8 @@ npm run serve   # python3 -m http.server 8000, open http://localhost:8000
 |------|------|
 | `index.html` | single page, loads the module graph + registers the service worker |
 | `src/settle.js` | net calc + settlement algorithm (pure, unit-tested) |
-| `src/state.js` | session model, localStorage, undo stack |
+| `src/state.js` | session model, localStorage, undo stack, currency preference |
+| `src/money.js` | active-currency formatting + world currency list (`Intl`) |
 | `src/share.js` | URL snapshot encode/decode, WhatsApp/plain-text summary |
 | `src/ui.js` | presentation helpers (`h`, avatars, formatting) |
 | `src/fx.js` | SVG icons, motion, haptics — all gated on `prefers-reduced-motion` |

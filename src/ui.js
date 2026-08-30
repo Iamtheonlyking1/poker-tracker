@@ -1,6 +1,6 @@
 // Dumb presentation helpers — no state, no side effects beyond DOM creation.
 
-import { rupee } from './share.js';
+import { fmtMoney } from './money.js';
 
 export const h = (tag, attrs = {}, ...kids) => {
   const el = document.createElement(tag);
@@ -25,7 +25,7 @@ export function fmtNet(n) {
   if (n === null) return h('span', { class: 'pmeta' }, 'not cashed out');
   if (n === 0) return h('span', { class: 'pmeta' }, 'even');
   const cls = n > 0 ? 'net-win' : 'net-loss';
-  return h('span', { class: cls }, (n > 0 ? '+' : '−') + rupee.format(Math.abs(n)));
+  return h('span', { class: cls }, (n > 0 ? '+' : '−') + fmtMoney(Math.abs(n)));
 }
 
 // net span that the results screen counts up
@@ -33,7 +33,7 @@ export function netCount(n) {
   if (n === 0) return h('span', { class: 'pmeta' }, 'even');
   const cls = n > 0 ? 'net-win' : 'net-loss';
   const sign = n > 0 ? '+' : '−';
-  return h('span', { class: cls, 'data-count': String(n) }, sign + rupee.format(Math.abs(n)));
+  return h('span', { class: cls, 'data-count': String(n) }, sign + fmtMoney(Math.abs(n)));
 }
 
 // deterministic colored-initials chip for a player name

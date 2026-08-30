@@ -458,10 +458,13 @@ button:disabled {
 /* ---------- inputs ---------- */
 
 input[type="text"],
-input[type="number"] {
+input[type="number"],
+input[type="search"] {
   font: inherit;
   width: 100%;
   min-height: var(--tap);
+  -webkit-appearance: none;
+  appearance: none;
   border-radius: 12px;
   border: 1px solid var(--border);
   background: rgba(0, 0, 0, 0.35);
@@ -720,6 +723,133 @@ label {
     transform: translateY(112vh) translateX(var(--drift, 0)) rotate(var(--rot, 180deg));
     opacity: 0;
   }
+}
+
+/* ---------- currency field + picker sheet ---------- */
+
+.field-btn {
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 0 14px;
+  font-weight: 550;
+}
+.field-btn .ic {
+  margin-left: auto;
+  color: var(--muted);
+}
+.cur-sym {
+  flex: none;
+  min-width: 1.4em;
+  text-align: center;
+  color: var(--gold);
+  font-weight: 700;
+}
+.cur-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cur-code {
+  flex: none;
+  color: var(--dim);
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+}
+
+.sheet-wrap {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+.sheet-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(4, 10, 7, 0.6);
+  backdrop-filter: blur(3px);
+  animation: fadein 0.2s var(--ease-out);
+}
+.sheet {
+  position: relative;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-bottom: 0;
+  border-radius: 20px 20px 0 0;
+  padding: 14px 16px calc(16px + env(safe-area-inset-bottom));
+  max-height: 82vh;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: var(--shadow-pop);
+  animation: sheetup 0.26s var(--ease-out);
+}
+.sheet-wrap.closing .sheet {
+  animation: sheetdown 0.2s var(--ease-in) forwards;
+}
+.sheet-wrap.closing .sheet-backdrop {
+  animation: fadeout 0.2s var(--ease-in) forwards;
+}
+@keyframes sheetup {
+  from {
+    transform: translateY(100%);
+  }
+}
+@keyframes sheetdown {
+  to {
+    transform: translateY(100%);
+  }
+}
+@keyframes fadein {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes fadeout {
+  to {
+    opacity: 0;
+  }
+}
+.sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.sheet-head b {
+  font-size: 1.05rem;
+}
+.sheet-list {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  margin: 0 -6px;
+  padding: 0 6px;
+}
+.currency-row {
+  width: 100%;
+  justify-content: flex-start;
+  gap: 12px;
+  min-height: 48px;
+  border: 0;
+  border-bottom: 1px solid var(--border-soft);
+  border-radius: 0;
+  background: transparent;
+  padding: 0 6px;
+  text-align: left;
+}
+.currency-row:active {
+  background: var(--surface-2);
+}
+.currency-row.on {
+  color: var(--gold);
+}
+.currency-row.on .cur-code {
+  color: var(--gold-deep);
+}
+.currency-row .cur-name {
+  flex: 1;
 }
 
 /* ---------- view transitions ---------- */

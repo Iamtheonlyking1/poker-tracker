@@ -1,5 +1,5 @@
 // Pure settlement logic. No DOM, no storage. Tested in tests/settle.test.js.
-// All money is integer rupees.
+// All money is integer units of the session currency.
 
 /** Sum of a player's buy-ins. */
 export function totalIn(player) {
@@ -15,12 +15,12 @@ export function net(player) {
   return player.cashOut - totalIn(player);
 }
 
-/** Total rupees put on the table across all players. */
+/** Total units put on the table across all players. */
 export function potIn(players) {
   return players.reduce((s, p) => s + totalIn(p), 0);
 }
 
-/** Total rupees claimed as ending stacks (players without a cashOut count as 0). */
+/** Total units claimed as ending stacks (players without a cashOut count as 0). */
 export function potOut(players) {
   return players.reduce((s, p) => s + (p.cashOut || 0), 0);
 }

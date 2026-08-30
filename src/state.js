@@ -2,6 +2,7 @@
 
 const ACTIVE_KEY = 'poker.active';
 const HISTORY_KEY = 'poker.history';
+const CURRENCY_KEY = 'poker.currency';
 const UNDO_LIMIT = 20;
 
 let undoStack = [];
@@ -10,12 +11,28 @@ function uid() {
   return Math.random().toString(36).slice(2, 9);
 }
 
-export function newSession({ name, defaultBuyIn }) {
+// last currency the user picked, so the next game defaults to it
+export function loadCurrencyPref() {
+  try {
+    return localStorage.getItem(CURRENCY_KEY) || 'INR';
+  } catch (e) {
+    return 'INR';
+  }
+}
+
+export function saveCurrencyPref(code) {
+  try {
+    localStorage.setItem(CURRENCY_KEY, code);
+  } catch (e) {}
+}
+
+export function newSession({ name, defaultBuyIn, currency }) {
   return {
     id: uid(),
     name: name || 'Poker night',
     startedAt: Date.now(),
     defaultBuyIn: Math.max(1, Math.round(defaultBuyIn || 500)),
+    currency: currency || loadCurrencyPref(),
     players: [],
     status: 'live', // 'live' | 'settled'
   };
