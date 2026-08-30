@@ -2,7 +2,9 @@ import {
   newSession,
   addPlayer,
   removePlayer,
+  renamePlayer,
   addBuyIn,
+  rebuyAll,
   setCashOut,
   save,
   loadActive,
@@ -16,6 +18,7 @@ import {
 } from './state.js';
 import { net, totalIn, potIn, settle, reconciliation } from './settle.js';
 import { rupee, summaryText, shareUrl, whatsappUrl, sessionFromUrl } from './share.js';
+import { h, escapeHtml, fmtNet, netCount, avatar, fmtDuration } from './ui.js';
 import * as fx from './fx.js';
 
 const app = document.getElementById('app');
@@ -26,24 +29,10 @@ let state = {
   session: null,
   shared: null,
   buyInPresets: [100, 200, 500, 1000],
+  _tick: null,
 };
 
-// ---------- element helper ----------
-
-const h = (tag, attrs = {}, ...kids) => {
-  const el = document.createElement(tag);
-  for (const [k, v] of Object.entries(attrs)) {
-    if (k === 'class') el.className = v;
-    else if (k === 'html') el.innerHTML = v;
-    else if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
-    else if (v !== null && v !== undefined) el.setAttribute(k, v);
-  }
-  for (const kid of kids.flat()) {
-    if (kid == null || kid === false) continue;
-    el.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
-  }
-  return el;
-};
+// ---------- small helpers ----------
 
 function toast(msg) {
   const t = h('div', { class: 'toast', role: 'status', 'aria-live': 'polite' }, msg);
@@ -82,29 +71,22 @@ function undo() {
   }
 }
 
-function fmtNet(n) {
-  if (n === null) return h('span', { class: 'pmeta' }, 'not cashed out');
-  if (n === 0) return h('span', { class: 'pmeta' }, 'even');
-  const cls = n > 0 ? 'net-win' : 'net-loss';
-  return h('span', { class: cls }, (n > 0 ? '+' : '−') + rupee.format(Math.abs(n)));
+function go(view) {
+  state.view = view;
+  render({ nav: true });
 }
 
-// net span that counts up on the results screen
-function netCount(n) {
-  if (n === 0) return h('span', { class: 'pmeta' }, 'even');
-  const cls = n > 0 ? 'net-win' : 'net-loss';
-  const sign = n > 0 ? '+' : '−';
-  return h('span', { class: cls, 'data-count': String(n) }, sign + rupee.format(Math.abs(n)));
+function elapsedPill(s) {
+  return h('span', {
+    class: 'timer',
+    html: fx.icon('clock') + `<span id="elapsed">${fmtDuration(Date.now() - s.startedAt)}</span>`,
+  });
 }
 
-function escapeHtml(str) {
-  return str.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-}
-
-// ---------- views ----------
+// ---------- setup ----------
 
 function viewSetup() {
-  const nameIn = h('input', { type: 'text', placeholder: 'Friday game', value: 'Poker night' });
+  const nameIn = h('input', { type: 'text', placeholder: 'Friday game', value: 'Poker night', enterkeyhint: 'done', autocomplete: 'off' });
   let buyIn = 500;
 
   const chipRow = h('div', { class: 'chips' });
@@ -113,14 +95,14 @@ function viewSetup() {
       ...state.buyInPresets.map((v) =>
         h('button', {
           class: 'chip' + (v === buyIn ? ' on' : ''),
-          onclick: () => { buyIn = v; customIn.value = ''; renderChips(); fx.attachRipples(chipRow); },
+          onclick: () => { buyIn = v; customIn.value = ''; renderChips(); },
         }, rupee.format(v)),
       ),
     );
     fx.attachRipples(chipRow);
   };
   const customIn = h('input', {
-    type: 'number', inputmode: 'numeric', placeholder: 'Custom amount',
+    type: 'number', inputmode: 'numeric', placeholder: 'Custom amount', enterkeyhint: 'done',
     oninput: () => { const v = parseInt(customIn.value, 10); if (v > 0) buyIn = v; renderChips(); },
   });
   renderChips();
@@ -129,20 +111,22 @@ function viewSetup() {
   const list = h('div', {});
   const renderList = () => {
     list.replaceChildren(
-      ...pending.map((n, i) =>
-        h('div', { class: 'card' },
-          h('div', { class: 'row' },
-            h('span', { class: 'pname' }, n),
-            h('button', { class: 'sm danger icon-only', 'aria-label': 'Remove ' + n, html: fx.icon('close'),
-              onclick: () => { pending.splice(i, 1); renderList(); } }),
-          ),
-        ),
-      ),
+      ...(pending.length
+        ? pending.map((n, i) =>
+            h('div', { class: 'card row' },
+              h('div', { class: 'phead' }, avatar(n), h('div', { class: 'pinfo' }, h('div', { class: 'pname' }, n))),
+              h('button', { class: 'sm danger icon-only', 'aria-label': 'Remove ' + n, html: fx.icon('close'),
+                onclick: () => { pending.splice(i, 1); renderList(); } }),
+            ),
+          )
+        : [h('p', { class: 'muted empty' }, 'Add everyone at the table.')]),
     );
     fx.attachRipples(list);
   };
+  renderList();
+
   const playerIn = h('input', {
-    type: 'text', placeholder: 'Add player name, press Enter',
+    type: 'text', placeholder: 'Add player name, press Enter', enterkeyhint: 'done', autocomplete: 'off',
     onkeydown: (e) => {
       if (e.key === 'Enter' && playerIn.value.trim()) {
         pending.push(playerIn.value.trim());
@@ -153,8 +137,7 @@ function viewSetup() {
   });
 
   const start = h('button', {
-    class: 'primary wide',
-    html: 'Deal me in' + fx.icon('forward'),
+    class: 'primary wide', html: 'Deal me in' + fx.icon('forward'),
     onclick: () => {
       if (pending.length < 2) return toast('Add at least 2 players');
       const s = newSession({ name: nameIn.value, defaultBuyIn: buyIn });
@@ -163,6 +146,7 @@ function viewSetup() {
       state.session = s;
       clearActive();
       save(s);
+      fx.haptic(15);
       go('live');
     },
   });
@@ -187,6 +171,8 @@ function viewSetup() {
   ];
 }
 
+// ---------- live ----------
+
 function topbar(session) {
   const pot = potIn(session.players);
   const n = session.players.length;
@@ -203,10 +189,26 @@ function viewLive() {
   const bump = (rect, amount) => {
     fx.floatUp(rect, '+' + rupee.format(amount));
     fx.pop(document.getElementById('pot-amt'));
+    fx.haptic(10);
   };
 
   const cards = s.players.map((p) => {
-    const custom = h('input', { type: 'number', inputmode: 'numeric', placeholder: 'Custom ₹' });
+    const nameEl = h('div', { class: 'pname' }, p.name);
+    const startRename = () => {
+      const inp = h('input', { class: 'rename', type: 'text', value: p.name, 'aria-label': 'Player name', enterkeyhint: 'done', autocomplete: 'off' });
+      const commit = () => {
+        const v = inp.value.trim();
+        if (v && v !== p.name) mutate((ss) => renamePlayer(ss, p.id, v));
+        else render();
+      };
+      inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); inp.blur(); } });
+      inp.addEventListener('blur', commit);
+      nameEl.replaceWith(inp);
+      inp.focus();
+      inp.select();
+    };
+
+    const custom = h('input', { type: 'number', inputmode: 'numeric', placeholder: 'Custom ₹', enterkeyhint: 'done' });
     const addCustom = (e) => {
       const v = parseInt(custom.value, 10);
       if (!(v > 0)) return;
@@ -218,12 +220,18 @@ function viewLive() {
 
     return h('div', { class: 'card' },
       h('div', { class: 'row' },
-        h('div', {},
-          h('div', { class: 'pname' }, p.name),
-          h('div', { class: 'pmeta' }, `In ${rupee.format(totalIn(p))} · ${p.buyIns.length} buy-in${p.buyIns.length === 1 ? '' : 's'}`),
+        h('div', { class: 'phead' },
+          avatar(p.name),
+          h('div', { class: 'pinfo' },
+            nameEl,
+            h('div', { class: 'pmeta' }, `In ${rupee.format(totalIn(p))} · ${p.buyIns.length} buy-in${p.buyIns.length === 1 ? '' : 's'}`),
+          ),
         ),
-        h('button', { class: 'sm danger icon-only', 'aria-label': 'Remove ' + p.name, html: fx.icon('close'),
-          onclick: () => confirm(`Remove ${p.name}?`) && mutate((ss) => removePlayer(ss, p.id)) }),
+        h('div', { class: 'card-actions' },
+          h('button', { class: 'sm ghost icon-only', 'aria-label': 'Rename ' + p.name, html: fx.icon('edit'), onclick: startRename }),
+          h('button', { class: 'sm danger icon-only', 'aria-label': 'Remove ' + p.name, html: fx.icon('close'),
+            onclick: () => confirm(`Remove ${p.name}?`) && mutate((ss) => removePlayer(ss, p.id)) }),
+        ),
       ),
       h('div', { class: 'btn-row' },
         h('button', {
@@ -241,7 +249,7 @@ function viewLive() {
   });
 
   const addName = h('input', {
-    type: 'text', placeholder: 'Late joiner name',
+    type: 'text', placeholder: 'Late joiner name', enterkeyhint: 'done', autocomplete: 'off',
     onkeydown: (e) => {
       if (e.key === 'Enter' && addName.value.trim()) {
         const nm = addName.value.trim();
@@ -254,9 +262,22 @@ function viewLive() {
   });
 
   return [
-    h('h1', {}, s.name),
+    h('div', { class: 'head-row' }, h('h1', {}, s.name), elapsedPill(s)),
     topbar(s),
-    ...cards,
+    h('div', { class: 'subbar' },
+      h('button', {
+        class: 'sm ghost wide', html: fx.icon('users') + `Round for everyone · ${rupee.format(s.defaultBuyIn)}`,
+        onclick: () => {
+          if (!s.players.length) return;
+          if (!confirm(`Add a ${rupee.format(s.defaultBuyIn)} buy-in for all ${s.players.length} players?`)) return;
+          mutate((ss) => rebuyAll(ss));
+          fx.haptic([12, 30, 12]);
+          fx.pop(document.getElementById('pot-amt'));
+          toast(`Round added · ${rupee.format(s.defaultBuyIn * s.players.length)}`);
+        },
+      }),
+    ),
+    h('div', { class: 'cards' }, ...cards),
     h('h2', {}, 'Add player'),
     addName,
     h('div', { class: 'actionbar' },
@@ -265,6 +286,8 @@ function viewLive() {
     ),
   ];
 }
+
+// ---------- cash out ----------
 
 function viewCashout() {
   const s = state.session;
@@ -277,7 +300,11 @@ function viewCashout() {
     if (rec.balanced) {
       banner.className = 'banner ok';
       banner.innerHTML = fx.icon('check') + `Pot balanced at ${rupee.format(rec.in)}`;
-      if (!wasBalanced) { banner.classList.add('flash'); setTimeout(() => banner.classList.remove('flash'), 800); }
+      if (!wasBalanced) {
+        banner.classList.add('flash');
+        setTimeout(() => banner.classList.remove('flash'), 800);
+        fx.haptic([12, 40, 12]);
+      }
     } else {
       banner.className = 'banner warn';
       banner.textContent =
@@ -294,7 +321,7 @@ function viewCashout() {
   const cards = s.players.map((p) => {
     let netSpan = fmtNet(net(p));
     const inp = h('input', {
-      type: 'number', inputmode: 'numeric', placeholder: 'Ending stack ₹', value: p.cashOut ?? '',
+      type: 'number', inputmode: 'numeric', placeholder: 'Ending stack ₹', enterkeyhint: 'done', value: p.cashOut ?? '',
       oninput: () => {
         const v = inp.value === '' ? null : parseInt(inp.value, 10);
         setCashOut(s, p.id, Number.isNaN(v) ? null : v);
@@ -307,9 +334,12 @@ function viewCashout() {
     });
     return h('div', { class: 'card' },
       h('div', { class: 'row' },
-        h('div', {},
-          h('div', { class: 'pname' }, p.name),
-          h('div', { class: 'pmeta' }, `In ${rupee.format(totalIn(p))}`),
+        h('div', { class: 'phead' },
+          avatar(p.name),
+          h('div', { class: 'pinfo' },
+            h('div', { class: 'pname' }, p.name),
+            h('div', { class: 'pmeta' }, `In ${rupee.format(totalIn(p))}`),
+          ),
         ),
         netSpan,
       ),
@@ -320,9 +350,9 @@ function viewCashout() {
   refresh();
 
   return [
-    h('h1', {}, 'Cash out'),
+    h('div', { class: 'head-row' }, h('h1', {}, 'Cash out'), elapsedPill(s)),
     banner,
-    ...cards,
+    h('div', { class: 'cards' }, ...cards),
     h('div', { class: 'actionbar' },
       h('button', { class: 'ghost', html: fx.icon('back') + 'Back', onclick: () => go('live') }),
       nextBtn,
@@ -330,14 +360,22 @@ function viewCashout() {
   ];
 }
 
+// ---------- results ----------
+
 function resultsBlock(s, { animate = false } = {}) {
   const rec = reconciliation(s.players);
   const rows = s.players.map((p) => ({ name: p.name, n: net(p) || 0 })).sort((a, b) => b.n - a.n);
   const transfers = settle(s.players);
+  const durMs = (s.settledAt || Date.now()) - s.startedAt;
 
   const out = [
     h('h1', {}, s.name),
-    h('p', { class: 'muted' }, new Date(s.startedAt).toLocaleString('en-IN', { dateStyle: 'medium' })),
+    h('div', { class: 'statstrip' },
+      h('span', {}, new Date(s.startedAt).toLocaleDateString('en-IN', { dateStyle: 'medium' })),
+      h('span', {}, `${s.players.length} players`),
+      h('span', {}, `${rupee.format(potIn(s.players))} in play`),
+      h('span', { html: fx.icon('clock') + fmtDuration(durMs) }),
+    ),
   ];
 
   if (!rec.balanced) {
@@ -348,11 +386,22 @@ function resultsBlock(s, { animate = false } = {}) {
   }
 
   out.push(h('h2', {}, 'Net'));
-  for (const r of rows) {
-    out.push(h('div', { class: 'card' },
-      h('div', { class: 'row' }, h('span', { class: 'pname' }, r.name), animate ? netCount(r.n) : fmtNet(r.n)),
-    ));
-  }
+  const netCards = rows.map((r, i) => {
+    const winner = i === 0 && r.n > 0;
+    return h('div', { class: 'card' + (winner ? ' winner' : '') },
+      h('div', { class: 'row' },
+        h('div', { class: 'phead' },
+          avatar(r.name),
+          h('div', { class: 'pinfo' },
+            h('div', { class: 'pname' }, winner ? h('span', { class: 'crown', html: fx.icon('crown') }) : null, r.name),
+            winner ? h('div', { class: 'pmeta' }, 'Biggest winner') : null,
+          ),
+        ),
+        animate ? netCount(r.n) : fmtNet(r.n),
+      ),
+    );
+  });
+  out.push(h('div', { class: 'cards' }, ...netCards));
 
   out.push(h('h2', {}, 'Settle up'));
   if (transfers.length === 0) {
@@ -382,6 +431,7 @@ function viewResults() {
       h('button', { class: 'wide', html: fx.icon('check') + 'Save to history & finish', onclick: () => {
         saveToHistory(s);
         clearActive();
+        fx.haptic(20);
         toast('Saved to history');
         state.session = null;
         go('history');
@@ -424,6 +474,8 @@ function viewShared() {
   return blocks;
 }
 
+// ---------- history ----------
+
 function lifetimeLeaderboard(hist) {
   const agg = new Map();
   for (const s of hist) {
@@ -443,12 +495,19 @@ function viewHistory() {
   const out = [h('h1', { html: fx.icon('trophy') + 'History' })];
 
   if (!hist.length) {
-    out.push(h('p', { class: 'muted' }, 'No saved games yet.'));
+    out.push(h('p', { class: 'muted empty' }, 'No saved games yet. Finish a game to see it here.'));
   } else {
     out.push(h('h2', {}, 'Lifetime'));
     lifetimeLeaderboard(hist).forEach((r, i) => {
       out.push(h('div', { class: 'lb-row' },
-        h('span', {}, h('span', { class: 'rank' }, `${i + 1}`), `${r.name} · ${r.games} game${r.games === 1 ? '' : 's'}`),
+        h('div', { class: 'phead' },
+          h('span', { class: 'rank' }, `${i + 1}`),
+          avatar(r.name, 30),
+          h('div', { class: 'pinfo' },
+            h('div', { class: 'pname sm' }, r.name),
+            h('div', { class: 'pmeta' }, `${r.games} game${r.games === 1 ? '' : 's'}`),
+          ),
+        ),
         fmtNet(r.net),
       ));
     });
@@ -498,8 +557,11 @@ let lastView = null;
 function render(opts = {}) {
   const view = state.view;
   const nav = opts.nav || lastView !== view;
-
   const firstPaint = lastView === null;
+
+  clearInterval(state._tick);
+  state._tick = null;
+
   const paint = () => {
     app.replaceChildren(...nodesFor(view).flat().filter(Boolean));
     lastView = view;
@@ -510,6 +572,13 @@ function render(opts = {}) {
   if (nav && !firstPaint) fx.withTransition(paint);
   else paint();
 
+  if ((view === 'live' || view === 'cashout') && state.session) {
+    state._tick = setInterval(() => {
+      const el = document.getElementById('elapsed');
+      if (el && state.session) el.textContent = fmtDuration(Date.now() - state.session.startedAt);
+    }, 30000);
+  }
+
   if (nav) {
     window.scrollTo({ top: 0 });
     if (view === 'results' || view === 'shared') requestAnimationFrame(afterResults);
@@ -518,16 +587,12 @@ function render(opts = {}) {
 
 function afterResults() {
   fx.celebrate();
+  fx.haptic([15, 50, 15, 50, 25]);
   app.querySelectorAll('[data-count]').forEach((el) => {
     const to = Number(el.dataset.count);
     const sign = to > 0 ? '+' : '−';
     fx.countUp(el, Math.abs(to), (v) => sign + rupee.format(Math.round(v)));
   });
-}
-
-function go(view) {
-  state.view = view;
-  render({ nav: true });
 }
 
 // ---------- boot ----------

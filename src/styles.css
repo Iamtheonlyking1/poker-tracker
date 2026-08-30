@@ -43,6 +43,7 @@ body {
 }
 html {
   background-color: var(--bg);
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
@@ -56,6 +57,8 @@ body {
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
     env(safe-area-inset-left);
   font-variant-numeric: tabular-nums;
+  overscroll-behavior-y: contain;
+  touch-action: manipulation;
 }
 
 /* subtle card-suit watermark on the table */
@@ -172,7 +175,8 @@ p {
   height: 1px;
   background: linear-gradient(90deg, transparent, var(--gold-glow), transparent);
 }
-.card .row {
+.card .row,
+.card.row {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -196,6 +200,148 @@ p {
   color: var(--loss);
   font-weight: 750;
   font-variant-numeric: tabular-nums;
+}
+
+/* ---------- player head (avatar + name) ---------- */
+
+.phead {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+  flex: 1;
+}
+.pinfo {
+  min-width: 0;
+}
+.pinfo .pname {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pname.sm {
+  font-size: 1rem;
+}
+.avatar {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 750;
+  font-size: 0.9rem;
+  letter-spacing: 0.02em;
+}
+.crown {
+  display: inline-flex;
+  margin-right: 6px;
+  color: var(--gold);
+}
+.crown .ic {
+  width: 17px;
+  height: 17px;
+  filter: drop-shadow(0 0 6px var(--gold-glow));
+}
+.card-actions {
+  display: flex;
+  gap: 6px;
+  flex: none;
+}
+.card.winner {
+  border-color: var(--gold-deep);
+  box-shadow: 0 0 0 1px var(--gold-glow), var(--shadow-card);
+}
+
+/* inline rename field */
+input.rename {
+  min-height: 38px;
+  font-weight: 650;
+  font-size: 1.06rem;
+  padding: 0 10px;
+}
+
+/* ---------- head row + timer pill ---------- */
+
+.head-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.timer {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--muted);
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  border-radius: 999px;
+  padding: 5px 11px;
+  font-variant-numeric: tabular-nums;
+}
+.timer .ic {
+  width: 14px;
+  height: 14px;
+  color: var(--gold);
+}
+
+/* ---------- sub-bar (round for everyone) ---------- */
+
+.subbar {
+  margin: 2px 0 10px;
+}
+.subbar .ic {
+  color: var(--gold);
+}
+
+/* ---------- results stat strip ---------- */
+
+.statstrip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  color: var(--muted);
+  font-size: 0.84rem;
+  margin: 4px 0 6px;
+}
+.statstrip span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.statstrip .ic {
+  width: 13px;
+  height: 13px;
+  color: var(--gold);
+}
+
+/* ---------- card grid on wide screens ---------- */
+
+@media (min-width: 620px) {
+  #app {
+    max-width: 760px;
+  }
+  .cards {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    align-items: start;
+  }
+  .cards .card {
+    margin: 0;
+  }
+}
+
+/* empty states */
+.empty {
+  padding: 22px 4px;
+  text-align: center;
 }
 
 /* ---------- buttons ---------- */
@@ -256,14 +402,14 @@ button.wide {
   width: 100%;
 }
 button.sm {
-  min-height: 40px;
+  min-height: 44px;
   padding: 0 12px;
   font-size: 0.9rem;
   border-radius: 10px;
 }
 button.icon-only {
-  min-height: 40px;
-  min-width: 40px;
+  min-height: 44px;
+  min-width: 44px;
   padding: 0;
   border-radius: 10px;
 }
@@ -453,13 +599,17 @@ label {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 11px 4px;
+  gap: 10px;
+  padding: 9px 4px;
   border-bottom: 1px solid var(--border-soft);
 }
 .lb-row .rank {
   color: var(--dim);
   font-variant-numeric: tabular-nums;
-  margin-right: 8px;
+  font-weight: 700;
+  width: 1.4em;
+  flex: none;
+  text-align: center;
 }
 .lb-row:first-of-type .rank {
   color: var(--gold);
@@ -577,6 +727,32 @@ label {
 ::view-transition-old(root),
 ::view-transition-new(root) {
   animation-duration: 0.28s;
+}
+
+/* ---------- installed / standalone ---------- */
+
+@media (display-mode: standalone) {
+  #app {
+    padding-top: 6px;
+  }
+}
+
+/* ---------- landscape phones ---------- */
+
+@media (orientation: landscape) and (max-height: 460px) {
+  #app {
+    padding-bottom: 88px;
+  }
+  h1 {
+    font-size: 1.35rem;
+    margin: 4px 0;
+  }
+  h2 {
+    margin: 14px 0 8px;
+  }
+  .topbar {
+    padding: 8px 0 10px;
+  }
 }
 
 /* ---------- reduced motion ---------- */

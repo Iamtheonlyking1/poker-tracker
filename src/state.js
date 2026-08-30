@@ -29,6 +29,17 @@ export function removePlayer(session, playerId) {
   session.players = session.players.filter((p) => p.id !== playerId);
 }
 
+export function renamePlayer(session, playerId, name) {
+  const p = session.players.find((x) => x.id === playerId);
+  if (p && name.trim()) p.name = name.trim();
+}
+
+// One rebuy at the default amount for every player at once.
+export function rebuyAll(session) {
+  const ts = Date.now();
+  session.players.forEach((p) => p.buyIns.push({ amount: session.defaultBuyIn, ts }));
+}
+
 export function addBuyIn(session, playerId, amount) {
   const p = session.players.find((x) => x.id === playerId);
   if (!p) return;

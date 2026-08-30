@@ -3,6 +3,15 @@
 export const reduceMotion = () =>
   window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+// light haptic tap; pattern in ms or array. no-op where unsupported.
+export function haptic(pattern = 12) {
+  try {
+    if (navigator.vibrate) navigator.vibrate(pattern);
+  } catch (e) {
+    /* unsupported */
+  }
+}
+
 // ---------- inline icons (stroke, 24x24, currentColor) ----------
 
 const P = {
@@ -21,6 +30,11 @@ const P = {
   copy: '<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/>',
   trash: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>',
   eye: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>',
+  edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
+  crown: '<path d="M3 8l4.5 4L12 5l4.5 7L21 8l-1.5 11h-15z"/>',
+  clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  users:
+    '<circle cx="9" cy="8" r="3.2"/><path d="M3.5 20c0-3.2 2.8-5.2 5.5-5.2s5.5 2 5.5 5.2"/><path d="M16.5 5.5a3.2 3.2 0 0 1 0 6"/><path d="M18.5 20c0-2.3-1-4-2.6-4.9"/>',
 };
 
 export function icon(name, cls = '') {
