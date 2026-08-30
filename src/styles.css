@@ -1,0 +1,299 @@
+:root {
+  --bg: #0f1115;
+  --surface: #191c23;
+  --surface-2: #21252e;
+  --border: #2c313c;
+  --text: #e8eaed;
+  --muted: #9aa0ac;
+  --accent: #4f8cff;
+  --accent-press: #3a6fd0;
+  --win: #35c46b;
+  --loss: #ff5a5a;
+  --warn: #ffb020;
+  --tap: 46px;
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+    env(safe-area-inset-left);
+}
+
+#app {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 16px 16px 96px;
+}
+
+h1 {
+  font-size: 1.4rem;
+  margin: 4px 0 2px;
+}
+h2 {
+  font-size: 1.05rem;
+  margin: 24px 0 10px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+p {
+  margin: 8px 0;
+}
+.muted {
+  color: var(--muted);
+}
+.center {
+  text-align: center;
+}
+
+/* ---- sticky header ---- */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: linear-gradient(var(--bg) 70%, transparent);
+  padding: 10px 0 12px;
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+.topbar .stat {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 6px 10px;
+  font-size: 0.85rem;
+}
+.topbar .stat b {
+  display: block;
+  font-size: 1rem;
+}
+
+/* ---- cards ---- */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px;
+  margin: 10px 0;
+}
+.card .row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+.pname {
+  font-weight: 650;
+  font-size: 1.1rem;
+}
+.pmeta {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.net-win {
+  color: var(--win);
+  font-weight: 700;
+}
+.net-loss {
+  color: var(--loss);
+  font-weight: 700;
+}
+
+/* ---- buttons ---- */
+button {
+  font: inherit;
+  min-height: var(--tap);
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  padding: 0 14px;
+  cursor: pointer;
+}
+button:active {
+  transform: translateY(1px);
+}
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: 650;
+}
+button.primary:active {
+  background: var(--accent-press);
+}
+button.ghost {
+  background: transparent;
+}
+button.danger {
+  color: var(--loss);
+  border-color: var(--loss);
+  background: transparent;
+}
+button.wide {
+  width: 100%;
+}
+button.sm {
+  min-height: 38px;
+  padding: 0 10px;
+  font-size: 0.9rem;
+}
+button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.btn-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+.btn-row > button {
+  flex: 1 1 auto;
+}
+
+/* ---- inputs ---- */
+input[type="text"],
+input[type="number"] {
+  font: inherit;
+  width: 100%;
+  min-height: var(--tap);
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  padding: 0 12px;
+}
+input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 0;
+}
+label {
+  display: block;
+  margin: 12px 0 4px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.chips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 6px 0;
+}
+.chip {
+  min-height: 40px;
+  border-radius: 999px;
+  padding: 0 16px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+.chip.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+/* ---- banners ---- */
+.banner {
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin: 12px 0;
+  font-weight: 600;
+}
+.banner.warn {
+  background: rgba(255, 176, 32, 0.12);
+  border: 1px solid var(--warn);
+  color: var(--warn);
+}
+.banner.ok {
+  background: rgba(53, 196, 107, 0.12);
+  border: 1px solid var(--win);
+  color: var(--win);
+}
+.banner.info {
+  background: rgba(79, 140, 255, 0.12);
+  border: 1px solid var(--accent);
+  color: var(--accent);
+}
+
+/* ---- settlement lines ---- */
+.settle-line {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin: 8px 0;
+  font-size: 1.05rem;
+}
+.settle-line b {
+  color: var(--accent);
+}
+
+/* ---- bottom action bar ---- */
+.actionbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+  display: flex;
+  gap: 8px;
+  z-index: 20;
+}
+.actionbar > button {
+  flex: 1;
+}
+
+/* ---- history ---- */
+.lb-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+.hist-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+.link {
+  color: var(--accent);
+  background: none;
+  border: none;
+  padding: 4px;
+  min-height: auto;
+  text-decoration: underline;
+}
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 90px;
+  transform: translateX(-50%);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 10px 16px;
+  border-radius: 999px;
+  z-index: 50;
+  font-size: 0.9rem;
+}
