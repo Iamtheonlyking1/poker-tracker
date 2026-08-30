@@ -9,6 +9,14 @@
   "background_color": "#08130d",
   "theme_color": "#08130d",
   "categories": ["utilities", "finance"],
+  "shortcuts": [
+    {
+      "name": "Poker Toolkit",
+      "short_name": "Toolkit",
+      "url": "./toolkit.html",
+      "description": "Ranges, odds, equity, range quiz"
+    }
+  ],
   "icons": [
     { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },

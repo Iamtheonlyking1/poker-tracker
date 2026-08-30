@@ -1,0 +1,1522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#080c18" />
+  <title>Poker Toolkit</title>
+
+  <link rel="manifest" href="manifest.json" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Poker Toolkit" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+  <link
+    rel="icon"
+    href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23080c18'/%3E%3Cpath d='M16 5c4 5 9 8 9 13a5 5 0 0 1-8 4c.3 1.7.8 3 1.9 4.2h-5.8C14.2 29.2 14.7 28 15 26.2a5 5 0 0 1-8-4C7 13 12 10 16 5z' fill='%2322c55e'/%3E%3C/svg%3E"
+  />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg:          #080c18;
+      --glass:       rgba(255,255,255,0.04);
+      --glass-hover: rgba(255,255,255,0.07);
+      --border:      rgba(255,255,255,0.08);
+      --accent:      #22c55e;
+      --accent-dim:  #16a34a;
+      --gold:        #f59e0b;
+      --red:         #ef4444;
+      --blue:        #3b82f6;
+      --lime:        #a3e635;
+      --text:        #f1f5f9;
+      --text-2:      #94a3b8;
+      --text-3:      #64748b;
+      --r-sm: 8px; --r-md: 12px; --r-lg: 16px; --r-xl: 20px; --r-2xl: 24px;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      background-image:
+        radial-gradient(ellipse 90% 55% at 50% -5%, rgba(34,197,94,.09) 0%, transparent 65%),
+        radial-gradient(ellipse 55% 40% at 85% 105%, rgba(59,130,246,.06) 0%, transparent 60%);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 24px 16px 64px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+    .wrap { max-width: 1100px; margin: 0 auto; }
+
+    /* Back link to the buy-in tracker */
+    .tk-back {
+      display: inline-flex; align-items: center; gap: 6px;
+      color: var(--text-2); text-decoration: none; font-size: 13px; font-weight: 600;
+      padding: 8px 12px; border: 1px solid var(--border); border-radius: 999px;
+      background: var(--glass); transition: color .15s, background .15s;
+    }
+    .tk-back:hover { color: var(--text); background: var(--glass-hover); }
+
+    /* Header */
+    header { text-align: center; padding: 36px 0 28px; }
+    .badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: rgba(34,197,94,.1); border: 1px solid rgba(34,197,94,.22);
+      border-radius: 999px; padding: 4px 14px;
+      font-size: 11px; font-weight: 700; color: var(--accent);
+      letter-spacing: .06em; text-transform: uppercase; margin-bottom: 18px;
+    }
+    .badge-dot { width:6px; height:6px; border-radius:50%; background:var(--accent); box-shadow:0 0 6px var(--accent); }
+    header h1 {
+      font-size: clamp(28px,5vw,44px); font-weight: 800; letter-spacing: -.03em; line-height: 1.1;
+      background: linear-gradient(140deg,#f1f5f9 10%,#64748b 90%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+      margin-bottom: 10px;
+    }
+    header p { color: var(--text-3); font-size: 14px; max-width: 480px; margin: 0 auto; }
+
+    /* Tab bar — horizontally scrollable on mobile */
+    .tabs {
+      display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none;
+      background: rgba(0,0,0,.35); border: 1px solid var(--border);
+      border-radius: var(--r-xl); padding: 4px; margin-bottom: 24px;
+    }
+    .tabs::-webkit-scrollbar { display: none; }
+    .tabBtn {
+      flex-shrink: 0; width: auto; border: 1px solid transparent; background: transparent;
+      color: var(--text-3); padding: 9px 14px; border-radius: var(--r-lg);
+      cursor: pointer; font-weight: 600; font-size: 13px; font-family: inherit;
+      letter-spacing: -.01em; transition: color .15s, background .15s, border-color .15s; white-space: nowrap;
+      box-shadow: none; margin-top: 0;
+    }
+    .tabBtn:hover:not(.active) { color: var(--text-2); background: var(--glass); }
+    .tabBtn.active { background: rgba(34,197,94,.12); border-color: rgba(34,197,94,.22); color: var(--accent); }
+
+    /* Panels */
+    .tabPanel { display: none; }
+    .tabPanel.active { display: block; animation: fadeIn .2s ease-out; }
+    @keyframes fadeIn { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:none; } }
+
+    /* Layout */
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    @media (max-width: 700px) { .grid2 { grid-template-columns: 1fr; } }
+
+    /* Cards */
+    .card { background: var(--glass); border: 1px solid var(--border); border-radius: var(--r-2xl); padding: 22px; }
+    .panel { background: rgba(0,0,0,.22); border: 1px solid var(--border); border-radius: var(--r-lg); padding: 18px; }
+
+    .section-title {
+      font-size: 14px; font-weight: 700; letter-spacing: -.02em; color: var(--text);
+      margin-bottom: 16px; display: flex; align-items: center; gap: 8px;
+    }
+    .section-title::before { content:''; display:block; width:3px; height:15px; background:var(--accent); border-radius:2px; flex-shrink:0; }
+
+    /* Form */
+    label {
+      display: block; font-size: 11px; font-weight: 700; color: var(--text-3);
+      letter-spacing: .05em; text-transform: uppercase; margin-bottom: 6px; margin-top: 14px;
+    }
+    label:first-of-type { margin-top: 0; }
+    input, select {
+      width: 100%; padding: 11px 14px; border-radius: var(--r-md);
+      border: 1px solid rgba(255,255,255,.1); background: rgba(0,0,0,.35);
+      color: var(--text); font-size: 15px; font-family: inherit; outline: none;
+      transition: border-color .15s, box-shadow .15s; -webkit-appearance: none; appearance: none;
+    }
+    input:focus, select:focus { border-color: rgba(34,197,94,.5); box-shadow: 0 0 0 3px rgba(34,197,94,.12); }
+    input::placeholder { color: var(--text-3); }
+    input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; }
+    select {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%2364748b' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 13px center; padding-right: 36px; cursor: pointer;
+    }
+    button {
+      width: 100%; padding: 12px 20px; border-radius: var(--r-md); border: none;
+      background: var(--accent); color: #fff; font-weight: 700; font-size: 14px; font-family: inherit;
+      cursor: pointer; letter-spacing: -.01em; transition: background .15s, transform .1s, box-shadow .15s;
+      box-shadow: 0 4px 20px rgba(34,197,94,.25); margin-top: 18px;
+    }
+    button:hover  { background: var(--accent-dim); box-shadow: 0 4px 28px rgba(34,197,94,.38); }
+    button:active { transform: scale(.98); }
+    button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+    /* BB result */
+    .bbResult {
+      margin-top: 16px; padding: 16px; border-radius: var(--r-lg);
+      background: rgba(245,158,11,.07); border: 1px solid rgba(245,158,11,.18);
+      text-align: center; font-size: 32px; font-weight: 800;
+      color: var(--gold); letter-spacing: -.03em; font-variant-numeric: tabular-nums;
+      min-height: 70px; display: flex; align-items: center; justify-content: center;
+    }
+    .bbResult.empty { font-size: 13px; font-weight: 500; color: var(--text-3); letter-spacing: 0; }
+
+    /* Notes list */
+    .notes-list { display: flex; flex-direction: column; }
+    .notes-item { display: flex; align-items: flex-start; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text-2); line-height: 1.55; }
+    .notes-item:last-child { border-bottom: none; padding-bottom: 0; }
+    .notes-dot { width:6px; height:6px; border-radius:50%; background:var(--accent); flex-shrink:0; margin-top:7px; }
+
+    /* Range viewer */
+    .rv-controls { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+    .rv-controls > div { flex: 1; min-width: 150px; }
+    .rv-info { font-size: 12px; color: var(--text-3); text-align: center; margin-bottom: 12px; padding: 10px; background: rgba(0,0,0,.2); border-radius: var(--r-md); border: 1px solid var(--border); line-height: 1.6; }
+    .rv-scroll { overflow-x: auto; }
+    .rvGrid { border-collapse: collapse; font-size: 10px; width: 100%; max-width: 940px; margin: 0 auto; font-variant-numeric: tabular-nums; }
+    .rvGrid th, .rvGrid td { border: 1px solid rgba(255,255,255,.05); text-align: center; width: 36px; height: 28px; padding: 0; user-select: none; }
+    .rvGrid th { background: rgba(255,255,255,.04); color: var(--text-2); font-weight: 700; font-size: 11px; position: sticky; top: 0; z-index: 2; }
+    .rvCell { background: rgba(0,0,0,.25); color: rgba(255,255,255,.28); font-weight: 500; cursor: default; transition: background .1s; }
+    .rvCell:hover { background: rgba(255,255,255,.07); color: var(--text); }
+    .rvIn  { background: rgba(22,163,74,.32);  color: #86efac; font-weight: 700; }
+    .rvIn:hover  { background: rgba(22,163,74,.48); }
+    .rvMix { background: rgba(163,230,53,.18); color: #d9f99d; font-weight: 600; }
+    .rvMix:hover { background: rgba(163,230,53,.3); }
+    .legend { display: flex; justify-content: center; align-items: center; gap: 16px; margin-top: 12px; flex-wrap: wrap; }
+    .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-2); font-weight: 500; }
+    .legend-swatch { width: 12px; height: 12px; border-radius: 3px; }
+    .legend-swatch.open { background: rgba(22,163,74,.55); }
+    .legend-swatch.mix  { background: rgba(163,230,53,.38); }
+    .legend-swatch.none { background: rgba(255,255,255,.12); }
+
+    /* Action selector */
+    .asRow { display: flex; gap: 10px; }
+    .asRow > div { flex: 1; }
+    .handBox { margin-top: 14px; padding: 14px; background: rgba(0,0,0,.3); border: 1px solid var(--border); border-radius: var(--r-lg); text-align: center; }
+    .handBox .big { font-size: 24px; font-weight: 800; letter-spacing: -.02em; color: var(--text); margin-bottom: 4px; }
+    .handBox .small { font-size: 12px; color: var(--text-3); }
+    .result { margin-top: 14px; padding: 14px 18px; border-radius: var(--r-lg); text-align: center; font-size: 17px; font-weight: 800; letter-spacing: -.02em; line-height: 1.3; display: none; animation: fadeIn .18s ease-out; }
+    .raise { background: rgba(22,163,74,.2);  color: #86efac; border: 1px solid rgba(22,163,74,.3); }
+    .mix   { background: rgba(163,230,53,.14);color: #d9f99d; border: 1px solid rgba(163,230,53,.25); }
+    .call  { background: rgba(59,130,246,.15); color: #93c5fd; border: 1px solid rgba(59,130,246,.25); }
+    .fold  { background: rgba(239,68,68,.12);  color: #fca5a5; border: 1px solid rgba(239,68,68,.22); }
+    .error { background: rgba(100,116,139,.14);color: var(--gold); border: 1px solid rgba(100,116,139,.22); }
+    .toggleLine { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 13px; color: var(--text-2); cursor: pointer; user-select: none; }
+    .toggleLine input[type="checkbox"] { width:16px; height:16px; border-radius:4px; accent-color:var(--accent); cursor:pointer; flex-shrink:0; }
+    .pill { display:inline-block; padding:2px 8px; border-radius:999px; background:rgba(34,197,94,.1); color:var(--accent); font-size:11px; font-weight:700; border:1px solid rgba(34,197,94,.2); }
+    .debug { margin-top:10px; font-size:11px; color:var(--text-3); line-height:1.5; display:none; white-space:pre-wrap; background:rgba(0,0,0,.4); border-radius:var(--r-sm); padding:12px; font-family:'SF Mono','Fira Code',monospace; border:1px solid var(--border); }
+
+    /* ── ODDS & SPR ──────────────────────────────────────────── */
+    .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+    .stat-box { background: rgba(0,0,0,.3); border: 1px solid var(--border); border-radius: var(--r-md); padding: 14px; text-align: center; }
+    .stat-box .val { font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+    .stat-box .lbl { font-size: 11px; color: var(--text-3); text-transform: uppercase; font-weight: 600; letter-spacing: .05em; margin-top: 4px; }
+    .ev-pos { color: var(--accent); }
+    .ev-neg { color: var(--red); }
+    .ev-close { color: var(--gold); }
+    .verdict-box { margin-top: 12px; padding: 13px 16px; border-radius: var(--r-md); text-align: center; font-size: 16px; font-weight: 800; display: none; }
+    .outs-table { display: flex; flex-direction: column; }
+    .outs-row { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text-2); align-items: center; }
+    .outs-row:last-child { border-bottom: none; padding-bottom: 0; }
+    .outs-row.hdr { font-size: 11px; font-weight: 700; color: var(--text-3); text-transform: uppercase; letter-spacing: .04em; }
+    .outs-row span:nth-child(2) { color: var(--gold); font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; }
+    .outs-row span:last-child { color: var(--accent); font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; min-width: 40px; }
+    .spr-display { text-align: center; padding: 14px 0; }
+    .spr-num { font-size: 36px; font-weight: 800; color: var(--gold); font-variant-numeric: tabular-nums; }
+    .spr-interp { font-size: 13px; color: var(--text-2); margin-top: 4px; }
+    .spr-guide { display: grid; grid-template-columns: 70px 1fr; gap: 6px 12px; margin-top: 14px; font-size: 13px; }
+    .spr-range { font-weight: 700; color: var(--gold); font-variant-numeric: tabular-nums; }
+
+    /* ── QUIZ ────────────────────────────────────────────────── */
+    .quiz-hand-display {
+      text-align: center; padding: 24px 12px 16px;
+      font-size: 52px; font-weight: 800; letter-spacing: -.02em;
+      color: var(--text); font-variant-numeric: tabular-nums; line-height: 1;
+    }
+    .quiz-context { text-align: center; font-size: 14px; color: var(--text-2); margin-bottom: 20px; line-height: 1.5; }
+    .quiz-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .quiz-btn {
+      padding: 13px; border-radius: var(--r-md); border: 1px solid var(--border);
+      background: var(--glass); color: var(--text); font-size: 15px; font-weight: 700;
+      font-family: inherit; cursor: pointer; transition: all .15s; width: auto; margin-top: 0; box-shadow: none;
+    }
+    .quiz-btn:hover { background: var(--glass-hover); transform: none; }
+    .quiz-btn.qb-open { border-color: rgba(34,197,94,.3); color: var(--accent); }
+    .quiz-btn.qb-open:hover { background: rgba(34,197,94,.1); }
+    .quiz-btn.qb-fold { border-color: rgba(239,68,68,.3); color: var(--red); }
+    .quiz-btn.qb-fold:hover { background: rgba(239,68,68,.08); }
+    .quiz-feedback { margin-top: 12px; padding: 13px; border-radius: var(--r-md); text-align: center; font-size: 15px; font-weight: 700; display: none; }
+    .fb-correct { background: rgba(34,197,94,.15); border: 1px solid rgba(34,197,94,.3); color: #86efac; }
+    .fb-wrong   { background: rgba(239,68,68,.12); border: 1px solid rgba(239,68,68,.25); color: #fca5a5; }
+    .fb-mix     { background: rgba(163,230,53,.14); border: 1px solid rgba(163,230,53,.25); color: #d9f99d; }
+    .quiz-next-btn { display: none; }
+    .score-display { text-align: center; padding: 12px 0; }
+    .score-big { font-size: 48px; font-weight: 800; color: var(--accent); font-variant-numeric: tabular-nums; line-height: 1; }
+    .score-pct-lbl { font-size: 12px; color: var(--text-3); font-weight: 700; text-transform: uppercase; letter-spacing: .06em; margin-top: 2px; }
+    .score-row { display: flex; justify-content: space-around; margin-top: 18px; }
+    .score-stat .n { font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--text); }
+    .score-stat .l { font-size: 11px; color: var(--text-3); text-transform: uppercase; font-weight: 600; letter-spacing: .04em; margin-top: 2px; }
+    .streak-badge { display: inline-flex; align-items: center; gap: 5px; background: rgba(245,158,11,.1); border: 1px solid rgba(245,158,11,.2); border-radius: 999px; padding: 4px 12px; font-size: 12px; color: var(--gold); font-weight: 700; margin-top: 12px; }
+
+    /* ── SESSION TRACKER ─────────────────────────────────────── */
+    .session-totals { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 16px; }
+    .session-log { overflow-x: auto; }
+    .sess-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .sess-table th { font-size: 11px; font-weight: 700; color: var(--text-3); text-transform: uppercase; letter-spacing: .04em; padding: 8px 10px; border-bottom: 1px solid var(--border); text-align: left; white-space: nowrap; }
+    .sess-table td { padding: 10px 10px; border-bottom: 1px solid var(--border); color: var(--text-2); white-space: nowrap; }
+    .sess-table tr:last-child td { border-bottom: none; }
+    .profit-pos { color: var(--accent); font-weight: 700; }
+    .profit-neg { color: var(--red); font-weight: 700; }
+    .del-btn { background: none; border: none; color: var(--text-3); cursor: pointer; font-size: 14px; padding: 2px 6px; width: auto; margin-top: 0; box-shadow: none; transition: color .15s; }
+    .del-btn:hover { color: var(--red); background: none; transform: none; }
+    .empty-state { text-align: center; padding: 32px 16px; color: var(--text-3); font-size: 14px; }
+
+    /* ── PLAYER TYPES REFERENCE ──────────────────────────────── */
+    .ptype-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .ptype-table th { font-size: 11px; font-weight: 700; color: var(--text-3); text-transform: uppercase; letter-spacing: .04em; padding: 8px 10px; border-bottom: 1px solid var(--border); text-align: left; }
+    .ptype-table td { padding: 10px 10px; border-bottom: 1px solid var(--border); color: var(--text-2); vertical-align: top; }
+    .ptype-table tr:last-child td { border-bottom: none; }
+    .ptype-name { font-weight: 700; color: var(--text); }
+    .ptype-stats { font-size: 11px; color: var(--gold); font-variant-numeric: tabular-nums; font-weight: 600; margin-top: 2px; }
+    .adjust-tag { display: inline-block; padding: 2px 7px; border-radius: 999px; font-size: 11px; font-weight: 600; margin: 1px; }
+    .tag-green { background: rgba(34,197,94,.15); color: #86efac; }
+    .tag-red   { background: rgba(239,68,68,.12); color: #fca5a5; }
+    .tag-blue  { background: rgba(59,130,246,.15); color: #93c5fd; }
+    .tag-gold  { background: rgba(245,158,11,.12); color: #fcd34d; }
+
+    /* Shared divider */
+    .divider { height: 1px; background: var(--border); margin: 18px 0; }
+
+    @media (max-width: 480px) {
+      body { padding: 16px 12px 48px; }
+      .card { padding: 16px; }
+      .stat-grid { grid-template-columns: 1fr 1fr; }
+      .session-totals { grid-template-columns: 1fr 1fr; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration:.01ms !important; transition-duration:.01ms !important; }
+    }
+
+    /* ── CHARTS ──────────────────────────────────────────────── */
+    .chart-lbl { font-size:11px; color:var(--text-3); font-weight:700; text-transform:uppercase; letter-spacing:.05em; margin-bottom:6px; }
+    canvas.chart { display:block; width:100%; border-radius:var(--r-md); background:rgba(0,0,0,.2); }
+
+    /* ── EQUITY CALC ─────────────────────────────────────────── */
+    .eq-card-row { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    .eq-board-3 { display:grid; grid-template-columns:repeat(3,1fr); gap:6px 8px; }
+    .eq-board-2 { display:grid; grid-template-columns:1fr 1fr; gap:6px 8px; margin-top:8px; }
+    .eq-slot-lbl { font-size:10px; color:var(--text-3); font-weight:700; text-transform:uppercase; margin-bottom:3px; }
+
+    /* ── STUDY TOOLS ─────────────────────────────────────────── */
+    .inner-tabs { display:flex; gap:6px; margin-bottom:16px; flex-wrap:wrap; }
+    .inner-tab { padding:7px 14px; border-radius:var(--r-md); border:1px solid var(--border); background:var(--glass); color:var(--text-3); font-size:12px; font-weight:600; font-family:inherit; cursor:pointer; width:auto; box-shadow:none; margin-top:0; transition:all .15s; white-space:nowrap; }
+    .inner-tab.active { background:rgba(34,197,94,.12); border-color:rgba(34,197,94,.22); color:var(--accent); }
+    .inner-panel { display:none; }
+    .inner-panel.active { display:block; }
+    .ref-table { width:100%; border-collapse:collapse; font-size:13px; }
+    .ref-table th { font-size:11px; font-weight:700; color:var(--text-3); text-transform:uppercase; letter-spacing:.04em; padding:8px 10px; border-bottom:1px solid var(--border); text-align:left; }
+    .ref-table td { padding:9px 10px; border-bottom:1px solid var(--border); color:var(--text-2); vertical-align:top; line-height:1.5; }
+    .ref-table tr:last-child td { border-bottom:none; }
+    .blocker-item { background:rgba(0,0,0,.25); border:1px solid var(--border); border-radius:var(--r-md); padding:14px; margin-bottom:10px; }
+    .blocker-item:last-child { margin-bottom:0; }
+    .blocker-hand { font-size:16px; font-weight:800; color:var(--text); margin-bottom:6px; }
+    .concept-item { background:rgba(0,0,0,.25); border:1px solid var(--border); border-radius:var(--r-md); padding:14px; margin-bottom:10px; }
+    .concept-item:last-child { margin-bottom:0; }
+    .concept-hd { font-size:14px; font-weight:700; color:var(--accent); margin-bottom:6px; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+
+  <a class="tk-back" href="index.html">&larr; Buy-in Tracker</a>
+
+  <header>
+    <div class="badge"><span class="badge-dot"></span>Preflop Intelligence</div>
+    <h1>Poker Toolkit</h1>
+    <p>BB calc · ranges · action advisor · pot odds · range quiz · session tracker</p>
+  </header>
+
+  <nav class="tabs" role="tablist" aria-label="Toolkit sections">
+    <button class="tabBtn active" role="tab" aria-selected="true"  data-tab="tab-bb">BB Calc</button>
+    <button class="tabBtn"        role="tab" aria-selected="false" data-tab="tab-ranges">Ranges</button>
+    <button class="tabBtn"        role="tab" aria-selected="false" data-tab="tab-action">Action</button>
+    <button class="tabBtn"        role="tab" aria-selected="false" data-tab="tab-odds">Odds & SPR</button>
+    <button class="tabBtn"        role="tab" aria-selected="false" data-tab="tab-quiz">Quiz</button>
+    <button class="tabBtn"        role="tab" aria-selected="false" data-tab="tab-tracker">Tracker</button>
+    <button class="tabBtn"        role="tab" aria-selected="false" data-tab="tab-equity">Equity</button>
+    <button class="tabBtn"        role="tab" aria-selected="false" data-tab="tab-study">Study</button>
+  </nav>
+
+  <!-- ══ TAB 1: Big Blinds ════════════════════════════════════ -->
+  <section id="tab-bb" class="tabPanel active" role="tabpanel">
+    <div class="grid2">
+      <div class="card">
+        <div class="section-title">Big Blinds Calculator</div>
+        <label for="bbStack">Stack size (chips)</label>
+        <input type="number" id="bbStack" placeholder="e.g. 25000" min="0" inputmode="numeric" />
+        <label for="bbValue">Big blind size (chips)</label>
+        <input type="number" id="bbValue" placeholder="e.g. 1200" min="1" inputmode="numeric" />
+        <button type="button" id="bbBtn">Calculate</button>
+        <div class="bbResult empty" id="bbOut" aria-live="polite">Enter values above</div>
+      </div>
+      <div class="card">
+        <div class="section-title">Stack Depth Guide</div>
+        <div class="notes-list">
+          <div class="notes-item"><span class="notes-dot"></span><span><strong>&lt;15 BB</strong> — Push/fold only. Open-raise sizing is irrelevant.</span></div>
+          <div class="notes-item"><span class="notes-dot"></span><span><strong>15–25 BB</strong> — Jam-or-fold. 3-bets are shoves; call-off thresholds tighten.</span></div>
+          <div class="notes-item"><span class="notes-dot"></span><span><strong>25–40 BB</strong> — SPR-compressed. Most 3-bet pots are effectively all-in.</span></div>
+          <div class="notes-item"><span class="notes-dot"></span><span><strong>40–60 BB</strong> — Transitional. Full range variety but small 4-bet tree.</span></div>
+          <div class="notes-item"><span class="notes-dot"></span><span><strong>60–100 BB</strong> — Full game. Use Ranges + Action tabs for complete guidance.</span></div>
+          <div class="notes-item"><span class="notes-dot"></span><span><strong>100+ BB</strong> — Deep play. Implied odds grow; speculative hands increase in value.</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ TAB 2: Ranges ════════════════════════════════════════ -->
+  <section id="tab-ranges" class="tabPanel" role="tabpanel">
+    <div class="card">
+      <div class="section-title">Opening Ranges Viewer — 2 to 9 Players</div>
+      <div class="rv-controls">
+        <div><label for="rvPlayers">Players</label><select id="rvPlayers"></select></div>
+        <div><label for="rvPos">Position</label><select id="rvPos"></select></div>
+        <div>
+          <label for="rvDepth">Stack depth</label>
+          <select id="rvDepth">
+            <option value="20">20 BB — tighter</option>
+            <option value="40" selected>40 BB</option>
+            <option value="60">60 BB</option>
+            <option value="100">100 BB</option>
+          </select>
+        </div>
+      </div>
+      <p class="rv-info">Upper-right = suited · lower-left = offsuit · diagonal = pairs. Model uses 8-max RFI mapped by position equivalence.</p>
+      <div class="rv-scroll"><table class="rvGrid" id="rvGrid" aria-label="Preflop range grid"></table></div>
+      <div class="legend">
+        <div class="legend-item"><span class="legend-swatch open"></span>Open-raise</div>
+        <div class="legend-item"><span class="legend-swatch mix"></span>Mix / part-time</div>
+        <div class="legend-item"><span class="legend-swatch none"></span>Fold</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ TAB 3: Action ════════════════════════════════════════ -->
+  <section id="tab-action" class="tabPanel" role="tabpanel">
+    <div class="grid2">
+      <div class="card">
+        <div class="section-title">Preflop Action Advisor</div>
+        <p style="font-size:13px;color:var(--text-3);margin-bottom:16px;line-height:1.6;">Rules-based GTO helper: RFI · vs open · vs 3-bet. Adapts to stack depth.</p>
+        <label for="asPlayers">Players at the table</label>
+        <select id="asPlayers"></select>
+        <label for="asPos">Your position</label>
+        <select id="asPos"></select>
+        <label for="asStack">Stack depth</label>
+        <select id="asStack">
+          <option value="10">10 BB — push/fold</option>
+          <option value="20">20 BB</option>
+          <option value="40" selected>40 BB</option>
+          <option value="60">60 BB</option>
+          <option value="100">100 BB</option>
+        </select>
+        <label for="asScenario">Scenario</label>
+        <select id="asScenario">
+          <option value="RFI" selected>Unopened pot (RFI)</option>
+          <option value="VS_OPEN">Facing an open raise</option>
+          <option value="VS_3BET">Facing a 3-bet</option>
+        </select>
+        <div class="toggleLine">
+          <input id="asAllowSbLimp" type="checkbox" checked />
+          <label for="asAllowSbLimp" style="margin:0;cursor:pointer;text-transform:none;font-size:13px;letter-spacing:0;color:var(--text-2);">Allow SB limps (RFI, 20 BB+)</label>
+          <span class="pill">SB only</span>
+        </div>
+        <div class="toggleLine">
+          <input id="asShowDebug" type="checkbox" />
+          <label for="asShowDebug" style="margin:0;cursor:pointer;text-transform:none;font-size:13px;letter-spacing:0;color:var(--text-2);">Show debug info</label>
+        </div>
+        <button id="asBtn" type="button">What should I do?</button>
+        <div class="result" id="asResult" role="status" aria-live="polite"></div>
+        <div class="debug" id="asDebug"></div>
+      </div>
+      <div class="card">
+        <div class="section-title">Your Hole Cards</div>
+        <label>Card 1</label>
+        <div class="asRow"><div><select id="asRank1"></select></div><div><select id="asSuit1"></select></div></div>
+        <label>Card 2</label>
+        <div class="asRow"><div><select id="asRank2"></select></div><div><select id="asSuit2"></select></div></div>
+        <div class="handBox" aria-live="polite">
+          <div class="big" id="asHandText">—</div>
+          <div class="small" id="asHandDetail">Select both cards above</div>
+        </div>
+        <div class="divider"></div>
+        <div class="notes-list">
+          <div class="notes-item"><span class="notes-dot"></span><span><strong>Raise</strong> — open or re-raise (value or semi-bluff)</span></div>
+          <div class="notes-item"><span class="notes-dot"></span><span><strong>Mix</strong> — solver frequency hand: sometimes raise, sometimes call</span></div>
+          <div class="notes-item"><span class="notes-dot"></span><span><strong>Call</strong> — flat or limp, no aggression</span></div>
+          <div class="notes-item"><span class="notes-dot"></span><span><strong>Fold</strong> — standard fold at this stack &amp; scenario</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ TAB 4: Odds & SPR ════════════════════════════════════ -->
+  <section id="tab-odds" class="tabPanel" role="tabpanel">
+    <div class="grid2">
+
+      <div class="card">
+        <div class="section-title">Pot Odds & Equity</div>
+        <label for="odPot">Pot before villain's bet (BB)</label>
+        <input type="number" id="odPot" placeholder="e.g. 12" min="0" inputmode="decimal" />
+        <label for="odBet">Villain's bet (BB)</label>
+        <input type="number" id="odBet" placeholder="e.g. 8" min="0" inputmode="decimal" />
+        <label for="odOuts">Your outs (number)</label>
+        <input type="number" id="odOuts" placeholder="e.g. 9" min="0" max="20" inputmode="numeric" />
+        <label for="odStreet">Street</label>
+        <select id="odStreet">
+          <option value="flop">Flop (2 cards to come — rule of 4)</option>
+          <option value="turn">Turn (1 card to come — rule of 2)</option>
+        </select>
+        <button type="button" id="odBtn">Calculate</button>
+        <div id="odResult"></div>
+        <div class="verdict-box" id="odVerdict"></div>
+      </div>
+
+      <div class="card">
+        <div class="section-title">Common Outs Reference</div>
+        <div class="outs-table">
+          <div class="outs-row hdr"><span>Draw type</span><span>Outs</span><span>Flop %</span></div>
+          <div class="outs-row"><span>Flush draw</span><span>9</span><span>~35%</span></div>
+          <div class="outs-row"><span>Open-ended straight (OESD)</span><span>8</span><span>~32%</span></div>
+          <div class="outs-row"><span>Two overcards</span><span>6</span><span>~24%</span></div>
+          <div class="outs-row"><span>Flush + gutshot</span><span>12</span><span>~45%</span></div>
+          <div class="outs-row"><span>Flush + pair (two pair+)</span><span>15</span><span>~54%</span></div>
+          <div class="outs-row"><span>Gutshot straight draw</span><span>4</span><span>~17%</span></div>
+          <div class="outs-row"><span>One overcard</span><span>3</span><span>~13%</span></div>
+          <div class="outs-row"><span>Pocket pair → set</span><span>2</span><span>~8%</span></div>
+        </div>
+
+        <div class="divider"></div>
+        <div class="section-title">SPR Calculator</div>
+        <label for="sprPot">Pot size (BB)</label>
+        <input type="number" id="sprPot" placeholder="e.g. 10" min="0" inputmode="decimal" />
+        <label for="sprStack">Effective stack (BB)</label>
+        <input type="number" id="sprStack" placeholder="e.g. 45" min="0" inputmode="decimal" />
+        <button type="button" id="sprBtn">Calculate SPR</button>
+        <div id="sprResult"></div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ══ TAB 5: Quiz ══════════════════════════════════════════ -->
+  <section id="tab-quiz" class="tabPanel" role="tabpanel">
+    <div class="grid2">
+
+      <div class="card" id="quizSetup">
+        <div class="section-title">Range Drilling Quiz</div>
+        <p style="font-size:13px;color:var(--text-3);margin-bottom:16px;line-height:1.6;">Flash cards to drill preflop ranges until they're instinct. GTO-correct answers based on the same model as the Action tab.</p>
+        <label for="qzMode">Quiz mode</label>
+        <select id="qzMode">
+          <option value="rfi">Open Raise — RFI (100 BB)</option>
+          <option value="shove">Push/Fold (≤12 BB)</option>
+        </select>
+        <label for="qzPlayers">Table size</label>
+        <select id="qzPlayers">
+          <option value="8" selected>8-max (default)</option>
+          <option value="6">6-max</option>
+          <option value="9">9-max</option>
+        </select>
+        <label for="qzPosFilter">Position filter</label>
+        <select id="qzPosFilter">
+          <option value="all">All positions</option>
+          <option value="early">Early (UTG / UTG+1 / LJ)</option>
+          <option value="late">Late (CO / BTN / SB)</option>
+          <option value="BTN">BTN only</option>
+          <option value="CO">CO only</option>
+          <option value="UTG">UTG only</option>
+        </select>
+        <button type="button" id="qzStartBtn">Start Quiz</button>
+        <button type="button" id="qzResetBtn" style="margin-top:8px;background:rgba(239,68,68,.15);color:#fca5a5;border:1px solid rgba(239,68,68,.25);box-shadow:none;">Reset Score</button>
+      </div>
+
+      <div class="card">
+        <div class="section-title">Score</div>
+        <div class="score-display" id="qzScoreDisplay">
+          <div class="score-big" id="qzPct">—</div>
+          <div class="score-pct-lbl">Accuracy</div>
+          <div class="score-row">
+            <div class="score-stat"><div class="n" id="qzCorrect">0</div><div class="l">Correct</div></div>
+            <div class="score-stat"><div class="n" id="qzTotal">0</div><div class="l">Answered</div></div>
+            <div class="score-stat"><div class="n" id="qzWrong">0</div><div class="l">Wrong</div></div>
+          </div>
+          <div><span class="streak-badge" id="qzStreak">🔥 0 streak</span></div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Active quiz card (shown when quiz is running) -->
+    <div id="quizCard" style="display:none; margin-top:16px;">
+      <div class="card">
+        <div class="quiz-hand-display" id="qzHand">—</div>
+        <div class="quiz-context" id="qzContext"></div>
+        <div class="quiz-btns">
+          <button class="quiz-btn qb-open" type="button" id="qzBtnOpen">Open / Raise</button>
+          <button class="quiz-btn qb-fold" type="button" id="qzBtnFold">Fold</button>
+        </div>
+        <div class="quiz-feedback" id="qzFeedback"></div>
+        <button type="button" id="qzNextBtn" class="quiz-next-btn" style="display:none;margin-top:12px;">Next hand →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ TAB 6: Tracker ═══════════════════════════════════════ -->
+  <section id="tab-tracker" class="tabPanel" role="tabpanel">
+    <div class="grid2">
+
+      <div class="card">
+        <div class="section-title">Log Session</div>
+        <label for="sessDate">Date</label>
+        <input type="date" id="sessDate" />
+        <label for="sessGame">Game / Stakes</label>
+        <input type="text" id="sessGame" placeholder="e.g. NL50, 1/2 live" />
+        <label for="sessBuyin">Buy-in</label>
+        <input type="number" id="sessBuyin" placeholder="e.g. 100" min="0" inputmode="decimal" />
+        <label for="sessCashout">Cash-out</label>
+        <input type="number" id="sessCashout" placeholder="e.g. 145" min="0" inputmode="decimal" />
+        <label for="sessHours">Hours played</label>
+        <input type="number" id="sessHours" placeholder="e.g. 3.5" min="0" step="0.25" inputmode="decimal" />
+        <label for="sessNotes">Notes (optional)</label>
+        <input type="text" id="sessNotes" placeholder="Reads, leaks, observations…" />
+        <button type="button" id="sessAddBtn">Add Session</button>
+      </div>
+
+      <div class="card">
+        <div class="section-title">Totals</div>
+        <div class="session-totals" id="sessTotals">
+          <div class="stat-box"><div class="val ev-pos" id="stProfit">&mdash;</div><div class="lbl">Total Profit</div></div>
+          <div class="stat-box"><div class="val" id="stSessions">0</div><div class="lbl">Sessions</div></div>
+          <div class="stat-box"><div class="val" id="stHourly">—</div><div class="lbl">Hourly</div></div>
+          <div class="stat-box"><div class="val" id="stROI">—</div><div class="lbl">Avg ROI</div></div>
+        </div>
+
+        <div class="section-title">Player Types Quick Reference</div>
+        <div style="overflow-x:auto;">
+          <table class="ptype-table">
+            <thead><tr><th>Type</th><th>Stats</th><th>Adjustments</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><div class="ptype-name">Nit</div></td>
+                <td><div class="ptype-stats">VPIP &lt;15 · PFR &lt;12</div></td>
+                <td><span class="adjust-tag tag-red">Fold to 3-bets</span><span class="adjust-tag tag-green">Steal wide</span></td>
+              </tr>
+              <tr>
+                <td><div class="ptype-name">TAG</div></td>
+                <td><div class="ptype-stats">VPIP 20-28 · PFR 16-22</div></td>
+                <td><span class="adjust-tag tag-blue">Play GTO</span><span class="adjust-tag tag-gold">Respect 3-bets</span></td>
+              </tr>
+              <tr>
+                <td><div class="ptype-name">LAG</div></td>
+                <td><div class="ptype-stats">VPIP 28+ · PFR 22+ · 3b 8%+</div></td>
+                <td><span class="adjust-tag tag-green">4-bet more</span><span class="adjust-tag tag-red">Tighten 3-bet bluffs</span></td>
+              </tr>
+              <tr>
+                <td><div class="ptype-name">Fish / Calling station</div></td>
+                <td><div class="ptype-stats">VPIP 45+ · PFR &lt;10</div></td>
+                <td><span class="adjust-tag tag-green">Value-bet thin</span><span class="adjust-tag tag-red">No bluffs</span></td>
+              </tr>
+              <tr>
+                <td><div class="ptype-name">Maniac</div></td>
+                <td><div class="ptype-stats">VPIP 55+ · PFR 45+ · 3b 15%+</div></td>
+                <td><span class="adjust-tag tag-green">Call down wider</span><span class="adjust-tag tag-gold">Trap AA/KK</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Session history -->
+    <div class="card" style="margin-top:16px;">
+      <div class="section-title">Session History</div>
+      <div class="session-log" id="sessLog">
+        <div class="empty-state">No sessions logged yet. Add your first session above.</div>
+      </div>
+    </div>
+
+    <!-- Analytics charts -->
+    <div class="card" style="margin-top:16px;">
+      <div class="section-title">Analytics</div>
+      <div class="grid2">
+        <div>
+          <div class="chart-lbl">Cumulative P&amp;L</div>
+          <canvas class="chart" id="chartPnL" height="150"></canvas>
+        </div>
+        <div>
+          <div class="chart-lbl">Profit per Session</div>
+          <canvas class="chart" id="chartSess" height="150"></canvas>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ TAB 7: Equity ════════════════════════════════════════ -->
+  <section id="tab-equity" class="tabPanel" role="tabpanel">
+    <div class="grid2">
+
+      <div class="card">
+        <div class="section-title">Equity Calculator</div>
+        <p style="font-size:13px;color:var(--text-3);margin-bottom:16px;line-height:1.6;">Monte Carlo simulation (1 500 runs). Enter hole cards + optional board, select villain's range.</p>
+
+        <label>Your hand — Card 1</label>
+        <div class="eq-card-row">
+          <select id="eqR1"></select><select id="eqS1"></select>
+        </div>
+        <label style="margin-top:10px;">Your hand — Card 2</label>
+        <div class="eq-card-row">
+          <select id="eqR2"></select><select id="eqS2"></select>
+        </div>
+
+        <label style="margin-top:14px;">Flop (optional)</label>
+        <div class="eq-board-3">
+          <div><div class="eq-slot-lbl">Card 1</div><select id="bR1" style="margin-bottom:4px;"></select><select id="bS1"></select></div>
+          <div><div class="eq-slot-lbl">Card 2</div><select id="bR2" style="margin-bottom:4px;"></select><select id="bS2"></select></div>
+          <div><div class="eq-slot-lbl">Card 3</div><select id="bR3" style="margin-bottom:4px;"></select><select id="bS3"></select></div>
+        </div>
+        <label style="margin-top:10px;">Turn / River (optional)</label>
+        <div class="eq-board-2">
+          <div><div class="eq-slot-lbl">Turn</div><select id="bR4" style="margin-bottom:4px;"></select><select id="bS4"></select></div>
+          <div><div class="eq-slot-lbl">River</div><select id="bR5" style="margin-bottom:4px;"></select><select id="bS5"></select></div>
+        </div>
+
+        <label for="eqRange" style="margin-top:14px;">Villain range</label>
+        <select id="eqRange">
+          <option value="premium">Premium — JJ+, AKs, AKo (~4%)</option>
+          <option value="strong" selected>Strong — 99+, ATs+, AQo+, KQs (~12%)</option>
+          <option value="wide">Wide — pairs, broadways, suited connectors (~30%)</option>
+          <option value="random">Random — any two cards</option>
+        </select>
+        <button type="button" id="eqBtn">Run Simulation</button>
+      </div>
+
+      <div class="card">
+        <div class="section-title">Results</div>
+        <div id="eqResult"><div class="empty-state" style="padding:48px 0;">Enter your hand and click Run Simulation.</div></div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ══ TAB 8: Study ══════════════════════════════════════════ -->
+  <section id="tab-study" class="tabPanel" role="tabpanel">
+    <div class="card">
+      <div class="section-title">Study Tools</div>
+      <div class="inner-tabs">
+        <button class="inner-tab active" data-inner="sizing">Bet Sizing</button>
+        <button class="inner-tab" data-inner="blockers">Blockers</button>
+        <button class="inner-tab" data-inner="concepts">Key Concepts</button>
+      </div>
+
+      <!-- Bet Sizing -->
+      <div class="inner-panel active" id="inner-sizing">
+        <div style="overflow-x:auto;">
+          <table class="ref-table">
+            <thead><tr><th>Size</th><th>When to use</th><th>Common spots</th></tr></thead>
+            <tbody>
+              <tr><td style="color:var(--gold);font-weight:700;white-space:nowrap;">25% pot</td><td>Thin value on ultra-dry boards; deny equity cheaply vs weak ranges</td><td>AA on 2-2-7 rainbow; K-7-2 rainbow vs wide BB range</td></tr>
+              <tr><td style="color:var(--gold);font-weight:700;white-space:nowrap;">33% pot (1/3)</td><td>Low SPR; value-heavy range on dry boards; high-frequency c-bets</td><td>Single-raised pot on A-x-x dry; nut flushes on two-tone turn</td></tr>
+              <tr><td style="color:var(--gold);font-weight:700;white-space:nowrap;">50% pot (1/2)</td><td>Balanced polar range; most common river size; draws + top of range</td><td>Flush draws; top pair good kicker; value on non-monotone boards</td></tr>
+              <tr><td style="color:var(--gold);font-weight:700;white-space:nowrap;">66% pot (2/3)</td><td>Moderately polar; equity denial on dynamic boards; semi-bluffs</td><td>Wet flops (J-T-9); sets; combo draws charging draws</td></tr>
+              <tr><td style="color:var(--gold);font-weight:700;white-space:nowrap;">75% pot (3/4)</td><td>OOP protection; strong hands vs multi-street draws</td><td>OOP two pair on turn vs flush/straight draws</td></tr>
+              <tr><td style="color:var(--gold);font-weight:700;white-space:nowrap;">Pot (100%)</td><td>Heavily polar; nuts vs bluffs only; force fold-or-call decisions</td><td>Sets vs 4-flush board; river jams; nut straights on paired boards</td></tr>
+              <tr><td style="color:var(--gold);font-weight:700;white-space:nowrap;">Overbet (125%+)</td><td>Nut-heavy range advantage; boards where one player has all the strong hands</td><td>Monotone boards (IP has all flushes); paired boards with sets</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="divider"></div>
+        <p style="font-size:12px;color:var(--text-3);line-height:1.7;"><strong style="color:var(--text-2);">Key principle:</strong> Smaller sizes → higher frequency, more bluffs. Larger sizes → more polarised, fewer combos. Match size to your range's polarity, not just your hand strength.</p>
+      </div>
+
+      <!-- Blockers -->
+      <div class="inner-panel" id="inner-blockers">
+        <div class="blocker-item">
+          <div class="blocker-hand">Ace in your hand</div>
+          <div class="notes-list">
+            <div class="notes-item"><span class="notes-dot"></span><span>Removes 3 combos of AA (from 6 → 3) — villain less likely to hold the nuts in 3-bet pots</span></div>
+            <div class="notes-item"><span class="notes-dot"></span><span>Blocks AKs, AKo, AQs — villain has fewer premium Ax holdings to 4-bet-call with</span></div>
+            <div class="notes-item"><span class="notes-dot"></span><span>Great 4-bet bluff blocker. Also blocks villain's strong calling hands → good bluff candidate</span></div>
+          </div>
+        </div>
+        <div class="blocker-item">
+          <div class="blocker-hand">King in your hand</div>
+          <div class="notes-list">
+            <div class="notes-item"><span class="notes-dot"></span><span>Blocks KK (6 → 3 combos), KQs, KJs, KTs — reduces villain's strong broadways</span></div>
+            <div class="notes-item"><span class="notes-dot"></span><span>Good 3-bet bluff card from BTN vs UTG open — unblocks villain's folding range (no Kx-heavy folds)</span></div>
+          </div>
+        </div>
+        <div class="blocker-item">
+          <div class="blocker-hand">Flush card in hand (e.g. 5♥ on K♥ T♥ 3♦)</div>
+          <div class="notes-list">
+            <div class="notes-item"><span class="notes-dot"></span><span>Each suited card you hold removes that card from villain's flush draw combos</span></div>
+            <div class="notes-item"><span class="notes-dot"></span><span>Holding A♥ on a 3-heart board → villain cannot have the nut flush, making bluff-catching easier</span></div>
+            <div class="notes-item"><span class="notes-dot"></span><span>Bluffing with a flush blocker on the river is a core GTO concept (you block their value, they fold bluff-catchers)</span></div>
+          </div>
+        </div>
+        <div class="blocker-item">
+          <div class="blocker-hand">Straight card in hand (e.g. 9 on J-T-8)</div>
+          <div class="notes-list">
+            <div class="notes-item"><span class="notes-dot"></span><span>Holding 9 on J-T-8 blocks the nut straight (QJ9x / 97x combos reduced ~50%)</span></div>
+            <div class="notes-item"><span class="notes-dot"></span><span>Good bluffing card when you block villain's nuts AND unblock their weak hands (the hands they'd fold)</span></div>
+          </div>
+        </div>
+        <div class="blocker-item">
+          <div class="blocker-hand">The "Unblocking" principle</div>
+          <div class="notes-list">
+            <div class="notes-item"><span class="notes-dot"></span><span>Good bluffs should UNBLOCK villain's folding range — don't hold the cards villain needs to fold a hand</span></div>
+            <div class="notes-item"><span class="notes-dot"></span><span>Example: bluff with 6♥5♥ on K♠7♣2♦ — 65s doesn't block top pair (Kx, 7x) which villain would fold to a bet</span></div>
+            <div class="notes-item"><span class="notes-dot"></span><span>Avoid bluffing K♥6♥ on K-7-2 — you hold a K which reduces villain's Kx folds (they can't have as many Kx)</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Key Concepts -->
+      <div class="inner-panel" id="inner-concepts">
+        <div class="concept-item">
+          <div class="concept-hd">MDF — Minimum Defence Frequency</div>
+          <div class="notes-list">
+            <div class="notes-item"><span class="notes-dot"></span><span><strong>Formula:</strong> MDF = Pot ÷ (Pot + Bet). Half-pot bet → MDF = 67%. Pot-size bet → MDF = 50%.</span></div>
+            <div class="notes-item"><span class="notes-dot"></span><span>Fold more than (1 − MDF) of your range and villain profits with any two cards as a bluff</span></div>
+            <div class="notes-item"><span class="notes-dot"></span><span>Use MDF to build calling ranges vs large bets, not to call every hand — mix in raises and folds appropriately</span></div>
+          </div>
+        </div>
+        <div class="concept-item">
+          <div class="concept-hd">Alpha — Break-Even Bluff Frequency</div>
+          <div class="notes-list">
+            <div class="notes-item"><span class="notes-dot"></span><span><strong>Formula:</strong> α = Bet ÷ (Pot + Bet). Half-pot bluff needs 33% fold equity. Pot-size needs 50%.</span></div>
+            <div class="notes-item"><span class="notes-dot"></span><span>If you estimate villain folds more than α, the bluff is immediately profitable regardless of your hand</span></div>
+          </div>
+        </div>
+        <div class="concept-item">
+          <div class="concept-hd">Range Advantage &amp; Nut Advantage</div>
+          <div class="notes-list">
+            <div class="notes-item"><span class="notes-dot"></span><span><strong>Range advantage:</strong> whose range connects better with the board overall (average equity)</span></div>
+            <div class="notes-item"><span class="notes-dot"></span><span><strong>Nut advantage:</strong> who has more combos of the strongest hands. More important for sizing — nuttier range can use larger sizes</span></div>
+            <div class="notes-item"><span class="notes-dot"></span><span>IP has range + nut advantage on dry high boards (A-7-2). BB has range advantage on low connected boards (7-6-5)</span></div>
+          </div>
+        </div>
+        <div class="concept-item">
+          <div class="concept-hd">Polarization vs Condensed Range</div>
+          <div class="notes-list">
+            <div class="notes-item"><span class="notes-dot"></span><span><strong>Polar:</strong> only nuts + bluffs → prefer large sizes (pot, overbet)</span></div>
+            <div class="notes-item"><span class="notes-dot"></span><span><strong>Condensed:</strong> medium-strength hands, no nutted combos → prefer small sizes to protect vs raises</span></div>
+            <div class="notes-item"><span class="notes-dot"></span><span>3-bet pot caller has a condensed range (no AA/KK). 3-bettor is polar. This drives who bets large postflop.</span></div>
+          </div>
+        </div>
+        <div class="concept-item">
+          <div class="concept-hd">GTO vs Exploitative Play</div>
+          <div class="notes-list">
+            <div class="notes-item"><span class="notes-dot"></span><span><strong>GTO:</strong> unexploitable equilibrium — the safe baseline vs unknowns</span></div>
+            <div class="notes-item"><span class="notes-dot"></span><span>vs Fish (VPIP 50+, low PFR): remove bluffs, value-bet every street thinner, size up vs calling stations</span></div>
+            <div class="notes-item"><span class="notes-dot"></span><span>vs Nit (&lt;15% VPIP): 3-bet wider, steal every unopened pot, fold to 3-bets unless premiums</span></div>
+            <div class="notes-item"><span class="notes-dot"></span><span>Use GTO as a baseline, deviate as soon as you have two or more reliable reads on a player</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</div><!-- .wrap -->
+
+<script type="module">
+  // Shared currency system with the buy-in tracker.
+  import { currencyCode, currencySymbol, setCurrency } from './src/money.js';
+  import { loadCurrencyPref } from './src/state.js';
+  setCurrency(loadCurrencyPref());
+  const CUR = () => currencySymbol(currencyCode());
+
+  // ── Tabs ─────────────────────────────────────────────────────
+  (function initTabs(){
+    const btns   = document.querySelectorAll(".tabBtn");
+    const panels = document.querySelectorAll(".tabPanel");
+    function show(tabId){
+      btns.forEach(b => { const a = b.dataset.tab===tabId; b.classList.toggle("active",a); b.setAttribute("aria-selected",a); });
+      panels.forEach(p => p.classList.toggle("active", p.id===tabId));
+      window.scrollTo({ top:0, behavior:"smooth" });
+    }
+    btns.forEach(b => b.addEventListener("click", () => {
+      show(b.dataset.tab);
+      if (b.dataset.tab === 'tab-tracker' && window._redrawCharts) setTimeout(window._redrawCharts, 50);
+    }));
+  })();
+
+  // ── BB calculator ────────────────────────────────────────────
+  (function initBB(){
+    const stackEl = document.getElementById("bbStack");
+    const bbEl    = document.getElementById("bbValue");
+    const outEl   = document.getElementById("bbOut");
+    function calc(){
+      const stack = parseFloat(stackEl.value), bb = parseFloat(bbEl.value);
+      if (isNaN(stack)||isNaN(bb)||bb<=0){ outEl.textContent="Enter valid stack and big blind."; outEl.className="bbResult empty"; return; }
+      outEl.textContent = (stack/bb).toFixed(1)+" BB";
+      outEl.className = "bbResult";
+    }
+    document.getElementById("bbBtn").addEventListener("click", calc);
+    [stackEl,bbEl].forEach(el => el.addEventListener("keydown", e => { if(e.key==="Enter") calc(); }));
+  })();
+
+  // ── Shared range data ────────────────────────────────────────
+  const RANKS = ["A","K","Q","J","T","9","8","7","6","5","4","3","2"];
+  const SUITS = ["♠","♥","♦","♣"];
+  const rankIndex = Object.fromEntries(RANKS.map((r,i) => [r,i]));
+
+  const ranges8_RFI = {
+    UTG:    new Set(["AA","KK","QQ","JJ","TT","99","88","77","66","55","AKs","AQs","AJs","ATs","A9s","A8s","A7s","A6s","A5s","KQs","KJs","KTs","QJs","QTs","JTs","T9s","AKo","AQo","KQo"]),
+    UTG_m:  new Set(["44","A4s","A3s","A2s","AJo","KJo","98s","87s"]),
+    UTG1:   new Set(["AA","KK","QQ","JJ","TT","99","88","77","66","55","AKs","AQs","AJs","ATs","A9s","A8s","A7s","A6s","A5s","A4s","A3s","A2s","KQs","KJs","KTs","K9s","QJs","QTs","JTs","T9s","98s","AKo","AQo","AJo","ATo","KQo","KJo"]),
+    UTG1_m: new Set(["44","33","87s","KTo","QTo","QJo","JTo"]),
+    LJ:     new Set(["AA","KK","QQ","JJ","TT","99","88","77","66","55","44","AKs","AQs","AJs","ATs","A9s","A8s","A7s","A6s","A5s","A4s","A3s","A2s","KQs","KJs","KTs","K9s","K8s","QJs","QTs","Q9s","JTs","J9s","T9s","98s","87s","76s","AKo","AQo","AJo","ATo","A9o","KQo","KJo","QJo","JTo","KTo"]),
+    LJ_m:   new Set(["33","22","A5o","K9o","QTo","T9o","98o"]),
+    HJ:     new Set(["AA","KK","QQ","JJ","TT","99","88","77","66","55","44","33","AKs","AQs","AJs","ATs","A9s","A8s","A7s","A6s","A5s","A4s","A3s","A2s","KQs","KJs","KTs","K9s","K8s","K7s","QJs","QTs","Q9s","Q8s","JTs","J9s","T9s","T8s","98s","97s","87s","86s","76s","65s","AKo","AQo","AJo","ATo","A9o","A8o","KQo","KJo","QJo","JTo","KTo","QTo","T9o"]),
+    HJ_m:   new Set(["22","K6s","Q7s","J8s","98o","87o"]),
+    CO:     new Set(["AA","KK","QQ","JJ","TT","99","88","77","66","55","44","33","22","AKs","AQs","AJs","ATs","A9s","A8s","A7s","A6s","A5s","A4s","A3s","A2s","KQs","KJs","KTs","K9s","K8s","K7s","K6s","QJs","QTs","Q9s","Q8s","Q7s","JTs","J9s","J8s","T9s","T8s","T7s","98s","97s","96s","87s","86s","85s","76s","75s","65s","64s","54s","AKo","AQo","AJo","ATo","A9o","A8o","A7o","KQo","KJo","QJo","JTo","KTo","QTo","T9o","98o","87o"]),
+    CO_m:   new Set(["K5s","Q6s","J7s","K9o","Q9o","J9o"]),
+    BTN:    new Set(["AA","KK","QQ","JJ","TT","99","88","77","66","55","44","33","22","AKs","AQs","AJs","ATs","A9s","A8s","A7s","A6s","A5s","A4s","A3s","A2s","KQs","KJs","KTs","K9s","K8s","K7s","K6s","K5s","K4s","K3s","QJs","QTs","Q9s","Q8s","Q7s","Q6s","JTs","J9s","J8s","J7s","T9s","T8s","T7s","T6s","98s","97s","96s","95s","87s","86s","85s","84s","76s","75s","74s","65s","64s","63s","54s","53s","AKo","AQo","AJo","ATo","A9o","A8o","A7o","A6o","A5o","KQo","KJo","QJo","JTo","KTo","QTo","T9o","98o","97o","87o","86o"]),
+    BTN_m:  new Set(["K2s","Q5s","J6s","T5s","K9o","Q9o","J9o","T8o"]),
+    SB:     new Set(["AA","KK","QQ","JJ","TT","99","88","77","66","55","44","33","AKs","AQs","AJs","ATs","A9s","A8s","A7s","A6s","A5s","A4s","A3s","A2s","KQs","KJs","KTs","K9s","K8s","K7s","QJs","QTs","Q9s","Q8s","JTs","J9s","J8s","T9s","T8s","98s","97s","87s","86s","76s","75s","65s","64s","54s","AKo","AQo","AJo","ATo","A9o","A8o","KQo","KJo","QJo","JTo","KTo","QTo","T9o","98o"]),
+    SB_m:   new Set(["22","K6s","Q7s","J7s","96s","85s","A7o","K9o","Q9o"]),
+    BB:     new Set(["AA","KK","QQ","JJ","TT","99","88","77","66","55","44","AKs","AQs","AJs","ATs","A9s","A8s","A7s","A6s","A5s","A4s","A3s","A2s","KQs","KJs","KTs","K9s","K8s","QJs","QTs","Q9s","JTs","J9s","T9s","T8s","98s","87s","76s","65s","54s","AKo","AQo","AJo","ATo","A9o","KQo","KJo","QJo","JTo","KTo","QTo","T9o"]),
+    BB_m:   new Set(["33","22","K7s","Q8s","J8s","97s","86s","75s","64s","A8o","K9o","Q9o","98o"])
+  };
+
+  const positionsByPlayers = {
+    2:["SB/BTN","BB"], 3:["BTN","SB","BB"], 4:["UTG","BTN","SB","BB"],
+    5:["UTG","CO","BTN","SB","BB"], 6:["UTG","MP","CO","BTN","SB","BB"],
+    7:["UTG","UTG+1","MP","CO","BTN","SB","BB"],
+    8:["UTG","UTG+1","LJ","HJ","CO","BTN","SB","BB"],
+    9:["UTG","UTG+1","UTG+2","LJ","HJ","CO","BTN","SB","BB"]
+  };
+
+  function mapToBase8(players, pos) {
+    if (players===8) return pos.replace("UTG+1","UTG1").replace("UTG+2","UTG2");
+    if (players===9) { if(pos==="UTG+1") return "UTG1"; if(pos==="UTG+2") return "LJ"; return pos.replace("UTG+1","UTG1").replace("UTG+2","LJ"); }
+    if (players===7) { if(pos==="UTG") return "UTG1"; if(pos==="UTG+1") return "LJ"; if(pos==="MP") return "HJ"; return pos; }
+    if (players===6) { if(pos==="UTG") return "LJ"; if(pos==="MP") return "HJ"; return pos; }
+    if (players===5) { if(pos==="UTG") return "HJ"; return pos; }
+    if (players===4) { if(pos==="UTG") return "CO"; return pos; }
+    if (players===3) return pos==="BTN"?"BTN":pos==="SB"?"SB":"BB";
+    if (players===2) return pos==="SB/BTN"?"BTN":"BB";
+    return "HJ";
+  }
+
+  function fillSelect(el, values, placeholder) {
+    el.innerHTML = "";
+    const ph = document.createElement("option");
+    ph.value=""; ph.textContent=placeholder; ph.disabled=true; ph.hidden=true;
+    el.appendChild(ph);
+    for (const v of values) { const o=document.createElement("option"); o.value=v; o.textContent=v; el.appendChild(o); }
+  }
+
+  // ── Range Viewer ─────────────────────────────────────────────
+  (function initRangeViewer(){
+    const playersEl=document.getElementById("rvPlayers"), posEl=document.getElementById("rvPos"),
+          depthEl=document.getElementById("rvDepth"), gridEl=document.getElementById("rvGrid");
+    function updatePositions(){ const p=parseInt(playersEl.value,10); const pos=positionsByPlayers[p]||positionsByPlayers[8]; fillSelect(posEl,pos,"Position…"); posEl.value=pos[0]; render(); }
+    function handKey(i,j){ const r1=RANKS[i],r2=RANKS[j]; if(i===j) return r1+r2; return (i<j?r1:r2)+(i<j?r2:r1)+(i<j?"s":"o"); }
+    function status(bucket,key,depth){
+      const main=ranges8_RFI[bucket]||new Set(), mix=ranges8_RFI[bucket+"_m"]||new Set();
+      if(depth<=20){ const m=new Set(["53s","63s","74s","84s","95s","T6s","97o","86o","87o","98o","T8o","T9o","J9o","Q9o","K9o","A5o","A6o","A7o"]); if(main.has(key)&&!m.has(key)) return"open"; if(mix.has(key)&&!m.has(key)) return"mix"; return"none"; }
+      if(main.has(key)) return"open"; if(mix.has(key)) return"mix"; return"none";
+    }
+    function render(){
+      const p=parseInt(playersEl.value,10), pos=posEl.value, depth=parseInt(depthEl.value,10);
+      if(!p||!pos) return;
+      let base=mapToBase8(p,pos).replace("UTG+1","UTG1").replace("UTG+2","UTG2");
+      if(base==="UTG2") base="LJ";
+      gridEl.innerHTML="";
+      const hr=document.createElement("tr"); hr.appendChild(document.createElement("th"));
+      for(const r of RANKS){ const th=document.createElement("th"); th.textContent=r; hr.appendChild(th); }
+      gridEl.appendChild(hr);
+      for(let i=0;i<13;i++){
+        const tr=document.createElement("tr"); const rh=document.createElement("th"); rh.textContent=RANKS[i]; tr.appendChild(rh);
+        for(let j=0;j<13;j++){
+          const td=document.createElement("td"); td.classList.add("rvCell");
+          const k=handKey(i,j); td.textContent=k.length===2?k:k.slice(0,3);
+          const st=status(base,k,depth); if(st==="open") td.classList.add("rvIn"); if(st==="mix") td.classList.add("rvMix");
+          tr.appendChild(td);
+        }
+        gridEl.appendChild(tr);
+      }
+    }
+    fillSelect(playersEl,["2","3","4","5","6","7","8","9"],"Players…"); playersEl.value="8"; updatePositions();
+    playersEl.addEventListener("change",updatePositions); posEl.addEventListener("change",render); depthEl.addEventListener("change",render);
+  })();
+
+  // ── Action Selector ──────────────────────────────────────────
+  (function initActionSelector(){
+    const elPlayers=document.getElementById("asPlayers"), elPos=document.getElementById("asPos"),
+          elStack=document.getElementById("asStack"), elScenario=document.getElementById("asScenario"),
+          elAllowSbLimp=document.getElementById("asAllowSbLimp"), elShowDebug=document.getElementById("asShowDebug"),
+          elRank1=document.getElementById("asRank1"), elSuit1=document.getElementById("asSuit1"),
+          elRank2=document.getElementById("asRank2"), elSuit2=document.getElementById("asSuit2"),
+          elHandText=document.getElementById("asHandText"), elHandDetail=document.getElementById("asHandDetail"),
+          elResult=document.getElementById("asResult"), elDebug=document.getElementById("asDebug");
+
+    function normalizeHandKey(r1,s1,r2,s2){
+      if(!r1||!s1||!r2||!s2) return{ok:false,msg:"Please select both cards."};
+      if(r1===r2&&s1===s2) return{ok:false,msg:"You can't select the same card twice."};
+      let hiR=r1,loR=r2,hiS=s1,loS=s2;
+      if(rankIndex[r2]<rankIndex[r1]){hiR=r2;hiS=s2;loR=r1;loS=s1;}
+      if(hiR===loR) return{ok:true,key:hiR+loR,display:`${hiR}${hiS} ${loR}${loS}`,cat:hiR+loR};
+      const suited=(hiS===loS), key=hiR+loR+(suited?"s":"o");
+      return{ok:true,key,display:`${hiR}${hiS} ${loR}${loS}`,cat:key};
+    }
+    function openSize(stackBB,pos){
+      if(stackBB<=12) return null;
+      const isLate=(pos==="BTN"||pos==="CO");
+      if(stackBB<=20) return pos==="SB"?2.5:2.0;
+      if(stackBB<=40) return pos==="SB"?2.5:(isLate?2.2:2.5);
+      return pos==="SB"?3.0:(isLate?2.2:2.5);
+    }
+    function threeBetSize(stackBB,pos){
+      if(stackBB<=12) return null;
+      const isOOP=(pos==="SB"||pos==="BB");
+      if(stackBB<=20) return isOOP?7.0:6.0;
+      if(stackBB<=40) return isOOP?9.5:7.5;
+      return isOOP?11.5:8.5;
+    }
+    function fourBetSize(stackBB){
+      if(stackBB<=25) return null;
+      if(stackBB<=40) return 18.0;
+      return 21.0;
+    }
+    const SB_LIMP=new Set(["22","33","44","55","A2s","A3s","A4s","A5s","A6s","K2s","K3s","K4s","K5s","K6s","K7s","K8s","Q6s","Q7s","Q8s","J7s","J8s","T7s","T8s","97s","98s","86s","87s","75s","76s","64s","65s","54s"]);
+    const SHOVE10={
+      UTG: new Set(["55","66","77","88","99","TT","JJ","QQ","KK","AA","ATo","AJo","AQo","AKo","A8s","A9s","ATs","AJs","AQs","AKs","KQs","KJs","QJs"]),
+      UTG1:new Set(["44","55","66","77","88","99","TT","JJ","QQ","KK","AA","A9o","ATo","AJo","AQo","AKo","A5s","A6s","A7s","A8s","A9s","ATs","AJs","AQs","AKs","KQo","KQs","KJs","KTs","QJs","QTs","JTs"]),
+      LJ:  new Set(["22","33","44","55","66","77","88","99","TT","JJ","QQ","KK","AA","A8o","A9o","ATo","AJo","AQo","AKo","A2s","A3s","A4s","A5s","A6s","A7s","A8s","A9s","ATs","AJs","AQs","AKs","KTo","KJo","KQo","K2s","K3s","K4s","K5s","K6s","K7s","K8s","K9s","KTs","KJs","KQs","QTo","QJo","Q2s","Q3s","Q4s","Q5s","Q6s","Q7s","Q8s","Q9s","QTs","QJs","JTs","T9s","98s"]),
+      HJ:  new Set(["22","33","44","55","66","77","88","99","TT","JJ","QQ","KK","AA","A5o","A6o","A7o","A8o","A9o","ATo","AJo","AQo","AKo","A2s","A3s","A4s","A5s","A6s","A7s","A8s","A9s","ATs","AJs","AQs","AKs","K9o","KTo","KJo","KQo","K2s","K3s","K4s","K5s","K6s","K7s","K8s","K9s","KTs","KJs","KQs","Q9o","QTo","QJo","Q2s","Q3s","Q4s","Q5s","Q6s","Q7s","Q8s","Q9s","QTs","QJs","J9o","JTo","J5s","J6s","J7s","J8s","J9s","JTs","T8s","T9s","98s","87s","76s"]),
+      CO:  new Set(["22","33","44","55","66","77","88","99","TT","JJ","QQ","KK","AA","A2o","A3o","A4o","A5o","A6o","A7o","A8o","A9o","ATo","AJo","AQo","AKo","A2s","A3s","A4s","A5s","A6s","A7s","A8s","A9s","ATs","AJs","AQs","AKs","K8o","K9o","KTo","KJo","KQo","K2s","K3s","K4s","K5s","K6s","K7s","K8s","K9s","KTs","KJs","KQs","Q8o","Q9o","QTo","QJo","Q2s","Q3s","Q4s","Q5s","Q6s","Q7s","Q8s","Q9s","QTs","QJs","J8o","J9o","JTo","J2s","J3s","J4s","J5s","J6s","J7s","J8s","J9s","JTs","T8o","T9o","T5s","T6s","T7s","T8s","T9s","98o","98s","87s","76s","65s","54s"]),
+      BTN: new Set(["22","33","44","55","66","77","88","99","TT","JJ","QQ","KK","AA","A2o","A3o","A4o","A5o","A6o","A7o","A8o","A9o","ATo","AJo","AQo","AKo","A2s","A3s","A4s","A5s","A6s","A7s","A8s","A9s","ATs","AJs","AQs","AKs","K2o","K3o","K4o","K5o","K6o","K7o","K8o","K9o","KTo","KJo","KQo","K2s","K3s","K4s","K5s","K6s","K7s","K8s","K9s","KTs","KJs","KQs","Q5o","Q6o","Q7o","Q8o","Q9o","QTo","QJo","Q2s","Q3s","Q4s","Q5s","Q6s","Q7s","Q8s","Q9s","QTs","QJs","J7o","J8o","J9o","JTo","J2s","J3s","J4s","J5s","J6s","J7s","J8s","J9s","JTs","T7o","T8o","T9o","T2s","T3s","T4s","T5s","T6s","T7s","T8s","T9s","97s","98s","87s","86s","76s","75s","65s","64s","54s"]),
+      SB:  new Set(["22","33","44","55","66","77","88","99","TT","JJ","QQ","KK","AA","A2o","A3o","A4o","A5o","A6o","A7o","A8o","A9o","ATo","AJo","AQo","AKo","A2s","A3s","A4s","A5s","A6s","A7s","A8s","A9s","ATs","AJs","AQs","AKs","K2o","K3o","K4o","K5o","K6o","K7o","K8o","K9o","KTo","KJo","KQo","K2s","K3s","K4s","K5s","K6s","K7s","K8s","K9s","KTs","KJs","KQs","Q5o","Q6o","Q7o","Q8o","Q9o","QTo","QJo","Q2s","Q3s","Q4s","Q5s","Q6s","Q7s","Q8s","Q9s","QTs","QJs","J7o","J8o","J9o","JTo","J2s","J3s","J4s","J5s","J6s","J7s","J8s","J9s","JTs","T7o","T8o","T9o","T2s","T3s","T4s","T5s","T6s","T7s","T8s","T9s","97o","98o","87o","76o","97s","98s","87s","86s","76s","75s","65s","64s","54s"])
+    };
+
+    function baseRfiDecision(pos,key,depth){
+      const main=ranges8_RFI[pos]||new Set(), mix=ranges8_RFI[pos+"_m"]||new Set();
+      if(depth<=20){ const m=new Set(["53s","63s","74s","84s","95s","T6s","97o","86o","87o","98o","T8o","T9o","J9o","Q9o","K9o","A5o","A6o","A7o"]); if(main.has(key)&&!m.has(key)) return{tier:"OPEN",weight:"pure"}; if(mix.has(key)&&!m.has(key)) return{tier:"OPEN",weight:"mix"}; return{tier:"FOLD"}; }
+      if(main.has(key)) return{tier:"OPEN",weight:"pure"}; if(mix.has(key)) return{tier:"OPEN",weight:"mix"}; return{tier:"FOLD"};
+    }
+    function vsOpenDecision(pos,key,depth){
+      if(depth<=12){ const s=SHOVE10[pos]||SHOVE10["BTN"]; return s.has(key)?{tier:"SHOVE"}:{tier:"FOLD"}; }
+      const EARLY=new Set(["UTG","UTG1","LJ"]),MID=new Set(["HJ","CO"]),BLIND=new Set(["BB"]);
+      const vE=new Set(["QQ","KK","AA","AKs","AKo"]),vM=new Set(["JJ","QQ","KK","AA","AKs","AKo","AQs"]),vL=new Set(["TT","JJ","QQ","KK","AA","AKs","AKo","AQs","AQo","AJs","KQs"]);
+      const bE=new Set(["A5s","A4s"]),bM=new Set(["A5s","A4s","A3s","KTs","QTs","JTs"]),bL=new Set(["A2s","A3s","A4s","A5s","K9s","Q9s","J9s","T9s","98s"]);
+      const cE=new Set(["TT","JJ","AQs","AJs","KQs"]),cM=new Set(["99","TT","JJ","AQs","AJs","ATs","KQs","KJs","QJs","JTs"]),cL=new Set(["77","88","99","TT","JJ","AQs","AJs","ATs","A9s","KQs","KJs","KTs","QJs","QTs","JTs","T9s","98s","87s"]);
+      const grp=EARLY.has(pos)?"EARLY":MID.has(pos)?"MID":"LATE";
+      let v=grp==="EARLY"?vE:grp==="MID"?vM:vL,b=grp==="EARLY"?bE:grp==="MID"?bM:bL,c=grp==="EARLY"?cE:grp==="MID"?cM:cL;
+      if(BLIND.has(pos)){ if(new Set(["QQ","KK","AA","AKs","AKo","AQs"]).has(key)) return{tier:"3BET_VALUE"}; if(new Set(["99","TT","JJ","AQs","AJs","ATs","KQs","QJs","JTs","T9s","98s"]).has(key)) return{tier:"CALL"}; return{tier:"FOLD"}; }
+      if(v.has(key)) return{tier:"3BET_VALUE"}; if(b.has(key)&&depth>=20) return{tier:"3BET_BLUFF"}; if(c.has(key)) return{tier:"CALL"}; return{tier:"FOLD"};
+    }
+    function vs3BetDecision(pos,key,depth){
+      if(depth<=12){ return new Set(["TT","JJ","QQ","KK","AA","AQs","AKs","AQo","AKo"]).has(key)?{tier:"SHOVE"}:{tier:"FOLD"}; }
+      const fv=depth<=25?new Set(["QQ","KK","AA","AKs","AKo"]):new Set(["QQ","KK","AA","AKs","AKo","AQs"]);
+      const cv=depth<=25?new Set(["JJ","TT","AQs"]):new Set(["JJ","TT","99","AQs","AJs","KQs"]);
+      if(fv.has(key)) return{tier:depth<=25?"4BET_SHOVE":"4BET_SIZE"}; if(cv.has(key)) return{tier:"CALL"}; return{tier:"FOLD"};
+    }
+    function decideAction(players,pos,depth,scenario,key,allowLimp){
+      const bp=mapToBase8(players,pos).replace("UTG+1","UTG1").replace("UTG+2","UTG2");
+      const base=bp==="UTG2"?"LJ":bp;
+      if(depth<=12&&scenario==="RFI"){ const s=SHOVE10[base]||SHOVE10["BTN"]; return s.has(key)?{cls:"raise",text:`${key} → Shove all-in`}:{cls:"fold",text:`${key} → Fold`}; }
+      if(scenario==="RFI"){
+        if(base==="BB") return{cls:"error",text:"RFI doesn't apply from the BB."};
+        const d=baseRfiDecision(base,key,depth);
+        if(d.tier==="FOLD") return{cls:"fold",text:`${key} → Fold`};
+        if(base==="SB"&&allowLimp&&depth>=20&&SB_LIMP.has(key)) return{cls:"call",text:`${key} → Limp (complete)`};
+        const sz=openSize(depth,base)??"all-in", mx=d.weight==="mix"?" (mix)":"";
+        return{cls:d.weight==="mix"?"mix":"raise",text:`${key} → Raise ${sz} BB${mx}`};
+      }
+      if(scenario==="VS_OPEN"){
+        const d=vsOpenDecision(base,key,depth);
+        if(d.tier==="FOLD") return{cls:"fold",text:`${key} → Fold`};
+        if(d.tier==="SHOVE") return{cls:"raise",text:`${key} → Shove (re-jam)`};
+        if(d.tier==="CALL") return{cls:"call",text:`${key} → Call`};
+        const sz=threeBetSize(depth,base)??"all-in";
+        if(d.tier==="3BET_VALUE") return{cls:"raise",text:`${key} → 3-bet to ${sz} BB (value)`};
+        if(d.tier==="3BET_BLUFF") return{cls:"mix",text:`${key} → 3-bet to ${sz} BB (bluff/mix)`};
+        return{cls:"fold",text:`${key} → Fold`};
+      }
+      if(scenario==="VS_3BET"){
+        const d=vs3BetDecision(base,key,depth);
+        if(d.tier==="FOLD") return{cls:"fold",text:`${key} → Fold`};
+        if(d.tier==="SHOVE"||d.tier==="4BET_SHOVE") return{cls:"raise",text:`${key} → 4-bet shove`};
+        if(d.tier==="CALL") return{cls:"call",text:`${key} → Call`};
+        const sz=fourBetSize(depth); return{cls:"raise",text:`${key} → 4-bet to ${sz} BB`};
+      }
+      return{cls:"error",text:"Unknown scenario."};
+    }
+    function updatePositions(){ const p=parseInt(elPlayers.value,10); const pos=positionsByPlayers[p]||positionsByPlayers[8]; fillSelect(elPos,pos,"Position…"); elPos.value=pos[0]; }
+    function updateHandPreview(){
+      const n=normalizeHandKey(elRank1.value,elSuit1.value,elRank2.value,elSuit2.value);
+      if(!n.ok){elHandText.textContent="—";elHandDetail.textContent="Select both cards above";return;}
+      elHandText.textContent=n.cat; elHandDetail.textContent=`${n.display} → ${n.cat}`;
+    }
+    function showResult(text,cls){elResult.style.display="block";elResult.className="result "+cls;elResult.textContent=text;}
+    function showDebug(obj){elDebug.style.display=elShowDebug.checked?"block":"none";if(elShowDebug.checked)elDebug.textContent=JSON.stringify(obj,null,2);}
+    function onGetAction(){
+      const p=parseInt(elPlayers.value,10),pos=elPos.value,depth=parseInt(elStack.value,10),sc=elScenario.value;
+      if(!p||!pos||!depth||!sc){showResult("Please select all options.","error");return;}
+      const n=normalizeHandKey(elRank1.value,elSuit1.value,elRank2.value,elSuit2.value);
+      if(!n.ok){showResult(n.msg,"error");return;}
+      const d=decideAction(p,pos,depth,sc,n.key,elAllowSbLimp.checked);
+      showResult(`${d.text}  ·  ${pos}, ${p}-max, ${depth} BB`,d.cls);
+      showDebug({players:p,pos,depth,sc,hand:n.key,mapped:mapToBase8(p,pos)});
+    }
+    fillSelect(elPlayers,["2","3","4","5","6","7","8","9"],"Players…"); elPlayers.value="8"; updatePositions();
+    fillSelect(elRank1,RANKS,"Rank…"); fillSelect(elRank2,RANKS,"Rank…"); fillSelect(elSuit1,SUITS,"Suit…"); fillSelect(elSuit2,SUITS,"Suit…");
+    updateHandPreview();
+    elPlayers.addEventListener("change",()=>{updatePositions();elResult.style.display="none";elDebug.style.display="none";});
+    [elPos,elStack,elScenario,elAllowSbLimp,elShowDebug,elRank1,elSuit1,elRank2,elSuit2].forEach(el=>el.addEventListener("change",()=>{updateHandPreview();elResult.style.display="none";elDebug.style.display="none";}));
+    document.getElementById("asBtn").addEventListener("click",onGetAction);
+  })();
+
+  // ── Odds & SPR ───────────────────────────────────────────────
+  (function initOdds(){
+    const potEl=document.getElementById("odPot"), betEl=document.getElementById("odBet"),
+          outsEl=document.getElementById("odOuts"), streetEl=document.getElementById("odStreet"),
+          resEl=document.getElementById("odResult"), verdEl=document.getElementById("odVerdict");
+
+    function calc(){
+      const pot=parseFloat(potEl.value), bet=parseFloat(betEl.value), outs=parseInt(outsEl.value,10);
+      if(isNaN(pot)||isNaN(bet)||pot<0||bet<=0){ resEl.innerHTML=""; verdEl.style.display="none"; return; }
+      const totalPot=pot+bet, callAmt=bet;
+      const potOddsPct=(callAmt/(totalPot+callAmt))*100;
+      let equity=0;
+      if(!isNaN(outs)&&outs>0){
+        if(streetEl.value==="flop") equity=Math.min(outs*4,100);
+        else equity=Math.min(outs*2,100);
+      }
+      const ev=!isNaN(outs)&&outs>0?(equity/100)*(totalPot+callAmt)-(1-equity/100)*callAmt:null;
+      resEl.innerHTML=`
+        <div class="stat-grid">
+          <div class="stat-box"><div class="val ev-close">${potOddsPct.toFixed(1)}%</div><div class="lbl">Pot odds (required equity)</div></div>
+          ${!isNaN(outs)&&outs>0?`<div class="stat-box"><div class="val ${equity>=potOddsPct?"ev-pos":"ev-neg"}">${equity.toFixed(1)}%</div><div class="lbl">Your equity (rule of ${streetEl.value==="flop"?"4":"2"})</div></div>`:""}
+          ${ev!==null?`<div class="stat-box"><div class="val ${ev>=0?"ev-pos":"ev-neg"}">${ev>=0?"+":""}${ev.toFixed(2)} BB</div><div class="lbl">EV of calling</div></div>`:""}
+          <div class="stat-box"><div class="val">${(totalPot+callAmt).toFixed(1)} BB</div><div class="lbl">Pot after call</div></div>
+        </div>`;
+      if(!isNaN(outs)&&outs>0){
+        const good=equity>=potOddsPct+3, close=Math.abs(equity-potOddsPct)<=3, bad=equity<potOddsPct-3;
+        verdEl.style.display="block";
+        if(good){ verdEl.className="verdict-box raise"; verdEl.textContent=`✓ Clear call — equity ${equity.toFixed(0)}% beats ${potOddsPct.toFixed(0)}% needed`; }
+        else if(close){ verdEl.className="verdict-box error"; verdEl.textContent=`⚡ Close — implied odds or reads needed (${equity.toFixed(0)}% vs ${potOddsPct.toFixed(0)}%)`; }
+        else { verdEl.className="verdict-box fold"; verdEl.textContent=`✗ Fold — equity ${equity.toFixed(0)}% short of ${potOddsPct.toFixed(0)}% needed`; }
+      } else verdEl.style.display="none";
+    }
+    document.getElementById("odBtn").addEventListener("click",calc);
+    [potEl,betEl,outsEl,streetEl].forEach(el=>el.addEventListener("change",calc));
+    [potEl,betEl,outsEl].forEach(el=>el.addEventListener("keydown",e=>{if(e.key==="Enter")calc();}));
+  })();
+
+  (function initSPR(){
+    const potEl=document.getElementById("sprPot"), stackEl=document.getElementById("sprStack"), resEl=document.getElementById("sprResult");
+    function calc(){
+      const pot=parseFloat(potEl.value), stack=parseFloat(stackEl.value);
+      if(isNaN(pot)||isNaN(stack)||pot<=0||stack<0){ resEl.innerHTML=""; return; }
+      const spr=(stack/pot);
+      let interp="", guide="";
+      if(spr<1) interp="Extremely low — committed with any pair or better";
+      else if(spr<2) interp="Very low — committed with top pair+";
+      else if(spr<4) interp="Low — need strong hand (top pair top kicker+)";
+      else if(spr<7) interp="Medium — two pair+ to felt it; draws become profitable";
+      else interp="High — speculative hands gain value; sets and straights pay off";
+      const threshold=(stack/(spr+1)).toFixed(1);
+      resEl.innerHTML=`
+        <div class="spr-display"><div class="spr-num">${spr.toFixed(1)}</div><div class="spr-interp">${interp}</div></div>
+        <div class="spr-guide">
+          <span class="spr-range">&lt;2</span><span style="color:var(--text-3);font-size:13px;">Committed — hard to fold top pair</span>
+          <span class="spr-range">2–4</span><span style="color:var(--text-3);font-size:13px;">Strong hand needed to call off</span>
+          <span class="spr-range">4–9</span><span style="color:var(--text-3);font-size:13px;">Two pair / sets become correct calls</span>
+          <span class="spr-range">9+</span><span style="color:var(--text-3);font-size:13px;">Deep — implied odds drive decisions</span>
+        </div>`;
+    }
+    document.getElementById("sprBtn").addEventListener("click",calc);
+    [potEl,stackEl].forEach(el=>el.addEventListener("keydown",e=>{if(e.key==="Enter")calc();}));
+  })();
+
+  // ── Quiz Mode ────────────────────────────────────────────────
+  (function initQuiz(){
+    // Build all 169 canonical hands
+    const ALL_HANDS=[];
+    for(let i=0;i<13;i++) for(let j=0;j<13;j++){
+      if(i<j) ALL_HANDS.push(RANKS[i]+RANKS[j]+"s");
+      else if(i>j) ALL_HANDS.push(RANKS[j]+RANKS[i]+"o");
+      else ALL_HANDS.push(RANKS[i]+RANKS[i]);
+    }
+    const CANONICAL=[...new Set(ALL_HANDS)];
+    const BASE_POSITIONS=["UTG","UTG1","LJ","HJ","CO","BTN","SB"];
+
+    function getRanking(pos,hand){ // returns 'open','mix','fold'
+      const main=ranges8_RFI[pos]||new Set(), mix=ranges8_RFI[pos+"_m"]||new Set();
+      if(main.has(hand)) return"open"; if(mix.has(hand)) return"mix"; return"fold";
+    }
+    function getShoveRanking(pos,hand){ return(SHOVE10[pos]||SHOVE10["BTN"]).has(hand)?"shove":"fold"; }
+
+    // Persist score
+    let score=JSON.parse(localStorage.getItem("ptk_quiz")||'{"correct":0,"total":0,"streak":0,"wrong":0}');
+    function saveScore(){ localStorage.setItem("ptk_quiz",JSON.stringify(score)); }
+    function renderScore(){
+      document.getElementById("qzCorrect").textContent=score.correct;
+      document.getElementById("qzTotal").textContent=score.total;
+      document.getElementById("qzWrong").textContent=score.wrong;
+      document.getElementById("qzPct").textContent=score.total>0?Math.round(score.correct/score.total*100)+"%":"—";
+      document.getElementById("qzStreak").textContent=`🔥 ${score.streak} streak`;
+    }
+    renderScore();
+
+    let currentHand=null, currentPos=null, currentAnswer=null, currentMode=null;
+
+    const handEl=document.getElementById("qzHand"), ctxEl=document.getElementById("qzContext"),
+          fbEl=document.getElementById("qzFeedback"), nextEl=document.getElementById("qzNextBtn"),
+          cardEl=document.getElementById("quizCard"), openBtn=document.getElementById("qzBtnOpen"),
+          foldBtn=document.getElementById("qzBtnFold");
+
+    function getFilteredPositions(){
+      const f=document.getElementById("qzPosFilter").value;
+      const all=BASE_POSITIONS;
+      if(f==="all") return all;
+      if(f==="early") return["UTG","UTG1","LJ"];
+      if(f==="late") return["CO","BTN","SB"];
+      if(all.includes(f)) return[f];
+      return all;
+    }
+
+    function nextQuestion(){
+      const mode=document.getElementById("qzMode").value;
+      currentMode=mode;
+      const positions=getFilteredPositions();
+      currentPos=positions[Math.floor(Math.random()*positions.length)];
+      currentHand=CANONICAL[Math.floor(Math.random()*CANONICAL.length)];
+
+      const posLabel=currentPos==="UTG1"?"UTG+1":currentPos;
+      const p=parseInt(document.getElementById("qzPlayers").value,10)||8;
+      const posDisplay=posLabel+", "+p+"-max";
+
+      if(mode==="shove") currentAnswer=getShoveRanking(currentPos,currentHand);
+      else currentAnswer=getRanking(currentPos,currentHand);
+
+      handEl.textContent=currentHand;
+      ctxEl.innerHTML=`<strong>${posDisplay}</strong><br>${mode==="shove"?"≤12 BB — Shove or fold?":"100 BB — Open raise or fold?"}`;
+      fbEl.style.display="none"; nextEl.style.display="none";
+      openBtn.textContent=mode==="shove"?"Shove":"Open / Raise";
+      openBtn.disabled=false; foldBtn.disabled=false;
+      cardEl.style.display="block";
+    }
+
+    function answer(userChoice){
+      openBtn.disabled=true; foldBtn.disabled=true;
+      const correct=currentAnswer, isOpen=(correct==="open"||correct==="shove");
+      const userOpenedOrShoved=(userChoice==="open");
+      const isCorrect=(userOpenedOrShoved&&isOpen)||(!userOpenedOrShoved&&correct==="fold");
+      const isMix=correct==="mix";
+
+      score.total++;
+      if(isCorrect||isMix){ score.correct++; score.streak++; }
+      else { score.wrong++; score.streak=0; }
+      saveScore(); renderScore();
+
+      if(isCorrect){ fbEl.className="quiz-feedback fb-correct"; fbEl.textContent=`✓ Correct! ${currentHand} from ${currentPos} = ${correct}.`; }
+      else if(isMix){ fbEl.className="quiz-feedback fb-mix"; fbEl.textContent=`≈ Mix hand — ${currentHand} from ${currentPos} is a mixed strategy (sometimes open, sometimes fold). Both are defensible.`; }
+      else { fbEl.className="quiz-feedback fb-wrong"; fbEl.textContent=`✗ Wrong. ${currentHand} from ${currentPos} = ${correct}. ${isOpen?"You should open this hand.":"This hand folds here."}`; }
+      fbEl.style.display="block"; nextEl.style.display="block";
+    }
+
+    document.getElementById("qzStartBtn").addEventListener("click",()=>{ nextQuestion(); });
+    document.getElementById("qzResetBtn").addEventListener("click",()=>{ score={correct:0,total:0,streak:0,wrong:0}; saveScore(); renderScore(); cardEl.style.display="none"; });
+    openBtn.addEventListener("click",()=>answer("open"));
+    foldBtn.addEventListener("click",()=>answer("fold"));
+    nextEl.addEventListener("click",nextQuestion);
+  })();
+
+  // ── Session Tracker ──────────────────────────────────────────
+  (function initTracker(){
+    const KEY="ptk_sessions";
+    let sessions=JSON.parse(localStorage.getItem(KEY)||"[]");
+
+    // Set today's date as default
+    const today=new Date().toISOString().split("T")[0];
+    document.getElementById("sessDate").value=today;
+
+    function save(){ localStorage.setItem(KEY,JSON.stringify(sessions)); }
+
+    function fmtMoney(n){ return(n>=0?"+":"−")+CUR()+Math.abs(n).toFixed(2); }
+    function fmtMoneyAbs(n){ return CUR()+Math.abs(n).toFixed(2); }
+
+    function renderTotals(){
+      const totalProfit=sessions.reduce((a,s)=>a+(s.cashout-s.buyin),0);
+      const totalHours=sessions.reduce((a,s)=>a+s.hours,0);
+      const totalBuyin=sessions.reduce((a,s)=>a+s.buyin,0);
+      document.getElementById("stProfit").textContent=fmtMoney(totalProfit);
+      document.getElementById("stProfit").className="val "+(totalProfit>=0?"ev-pos":"ev-neg");
+      document.getElementById("stSessions").textContent=sessions.length;
+      document.getElementById("stHourly").textContent=totalHours>0?(fmtMoney(totalProfit/totalHours)+"/hr"):"—";
+      document.getElementById("stROI").textContent=totalBuyin>0?((totalProfit/totalBuyin)*100).toFixed(1)+"%":"—";
+    }
+
+    function renderLog(){
+      const el=document.getElementById("sessLog");
+      if(sessions.length===0){ el.innerHTML='<div class="empty-state">No sessions logged yet. Add your first session above.</div>'; return; }
+      const rows=sessions.slice().reverse().map((s,ri)=>{
+        const profit=s.cashout-s.buyin;
+        const i=sessions.length-1-ri;
+        return`<tr>
+          <td>${s.date}</td>
+          <td>${s.game||"—"}</td>
+          <td>${fmtMoneyAbs(s.buyin)}</td>
+          <td>${fmtMoneyAbs(s.cashout)}</td>
+          <td class="${profit>=0?"profit-pos":"profit-neg"}">${fmtMoney(profit)}</td>
+          <td>${s.hours}h</td>
+          <td style="color:var(--text-3);font-size:12px;max-width:140px;overflow:hidden;text-overflow:ellipsis;">${s.notes||""}</td>
+          <td><button class="del-btn" data-idx="${i}" aria-label="Delete session">✕</button></td>
+        </tr>`;
+      }).join("");
+      el.innerHTML=`<table class="sess-table"><thead><tr><th>Date</th><th>Game</th><th>Buy-in</th><th>Cash-out</th><th>Profit</th><th>Hours</th><th>Notes</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
+      el.querySelectorAll(".del-btn").forEach(btn=>btn.addEventListener("click",()=>{
+        sessions.splice(parseInt(btn.dataset.idx),1); save(); renderTotals(); renderLog();
+        setTimeout(()=>redrawCharts(sessions),50);
+      }));
+    }
+
+    document.getElementById("sessAddBtn").addEventListener("click",()=>{
+      const date=document.getElementById("sessDate").value,
+            game=document.getElementById("sessGame").value.trim(),
+            buyin=parseFloat(document.getElementById("sessBuyin").value),
+            cashout=parseFloat(document.getElementById("sessCashout").value),
+            hours=parseFloat(document.getElementById("sessHours").value)||0,
+            notes=document.getElementById("sessNotes").value.trim();
+      if(!date||isNaN(buyin)||isNaN(cashout)){alert("Please fill in date, buy-in, and cash-out.");return;}
+      sessions.push({date,game,buyin,cashout,hours,notes,id:Date.now()});
+      save(); renderTotals(); renderLog();
+      setTimeout(()=>redrawCharts(sessions),50);
+      ["sessGame","sessBuyin","sessCashout","sessHours","sessNotes"].forEach(id=>document.getElementById(id).value="");
+    });
+
+    window._redrawCharts = () => redrawCharts(sessions);
+    renderTotals(); renderLog();
+    setTimeout(()=>redrawCharts(sessions),100);
+  })();
+
+  // ── Chart drawing ─────────────────────────────────────────────
+  function drawLineChart(canvasId, points) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    const W = canvas.parentElement.offsetWidth;
+    if (!W) return; // tab not visible yet
+    const dpr = window.devicePixelRatio || 1;
+    canvas.style.width = W + 'px'; canvas.style.height = '150px';
+    canvas.width = W * dpr; canvas.height = 150 * dpr;
+    const ctx = canvas.getContext('2d'); ctx.scale(dpr, dpr);
+    const H = 150;
+    if (points.length < 2) {
+      ctx.fillStyle = 'rgba(255,255,255,.2)'; ctx.font = '12px Inter,sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('Add sessions to see chart', W/2, H/2); return;
+    }
+    const PAD = {t:12,r:12,b:28,l:52}, cW = W-PAD.l-PAD.r, cH = H-PAD.t-PAD.b;
+    const minY = Math.min(...points,0), maxY = Math.max(...points,0), range = maxY-minY||1;
+    const px = i => PAD.l + (i/(points.length-1))*cW;
+    const py = v => PAD.t + cH - ((v-minY)/range)*cH;
+    ctx.font = '10px Inter,sans-serif'; ctx.textAlign = 'right';
+    [minY,0,maxY].filter((v,i,a)=>a.indexOf(v)===i).forEach(v=>{
+      ctx.strokeStyle='rgba(255,255,255,.06)'; ctx.lineWidth=1;
+      ctx.beginPath(); ctx.moveTo(PAD.l,py(v)); ctx.lineTo(W-PAD.r,py(v)); ctx.stroke();
+      ctx.fillStyle='rgba(255,255,255,.3)';
+      ctx.fillText((v>=0?'+':'−')+CUR()+Math.abs(v).toFixed(0), PAD.l-5, py(v)+3);
+    });
+    ctx.strokeStyle='rgba(255,255,255,.2)'; ctx.lineWidth=1;
+    ctx.setLineDash([3,3]); ctx.beginPath(); ctx.moveTo(PAD.l,py(0)); ctx.lineTo(W-PAD.r,py(0)); ctx.stroke(); ctx.setLineDash([]);
+    const grad = ctx.createLinearGradient(0,PAD.t,0,H-PAD.b);
+    grad.addColorStop(0,'rgba(34,197,94,.25)'); grad.addColorStop(1,'rgba(34,197,94,0)');
+    ctx.beginPath(); ctx.moveTo(px(0),py(points[0]));
+    for (let i=1;i<points.length;i++) ctx.lineTo(px(i),py(points[i]));
+    ctx.lineTo(px(points.length-1),py(minY)); ctx.lineTo(px(0),py(minY)); ctx.closePath();
+    ctx.fillStyle=grad; ctx.fill();
+    ctx.beginPath(); ctx.strokeStyle='#22c55e'; ctx.lineWidth=2; ctx.lineJoin='round';
+    ctx.moveTo(px(0),py(points[0]));
+    for (let i=1;i<points.length;i++) ctx.lineTo(px(i),py(points[i])); ctx.stroke();
+    points.forEach((v,i)=>{ ctx.beginPath(); ctx.arc(px(i),py(v),3,0,Math.PI*2); ctx.fillStyle=v>=0?'#22c55e':'#ef4444'; ctx.fill(); });
+  }
+
+  function drawBarChart(canvasId, values) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    const W = canvas.parentElement.offsetWidth;
+    if (!W) return;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.style.width = W+'px'; canvas.style.height='150px';
+    canvas.width = W*dpr; canvas.height = 150*dpr;
+    const ctx = canvas.getContext('2d'); ctx.scale(dpr,dpr);
+    const H = 150;
+    if (!values.length) {
+      ctx.fillStyle='rgba(255,255,255,.2)'; ctx.font='12px Inter,sans-serif';
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText('No sessions yet',W/2,H/2); return;
+    }
+    const PAD={t:12,r:12,b:28,l:52}, cW=W-PAD.l-PAD.r, cH=H-PAD.t-PAD.b;
+    const minY=Math.min(...values,0), maxY=Math.max(...values,0), range=maxY-minY||1;
+    const py = v => PAD.t+cH-((v-minY)/range)*cH;
+    const zeroY = py(0);
+    const step = cW/values.length, barW = Math.max(2,step*0.65);
+    ctx.font='10px Inter,sans-serif'; ctx.textAlign='right';
+    [minY,maxY].filter((v,i,a)=>a.indexOf(v)===i).forEach(v=>{
+      ctx.strokeStyle='rgba(255,255,255,.06)'; ctx.lineWidth=1;
+      ctx.beginPath(); ctx.moveTo(PAD.l,py(v)); ctx.lineTo(W-PAD.r,py(v)); ctx.stroke();
+      ctx.fillStyle='rgba(255,255,255,.3)';
+      ctx.fillText((v>=0?'+':'−')+CUR()+Math.abs(v).toFixed(0),PAD.l-5,py(v)+3);
+    });
+    ctx.strokeStyle='rgba(255,255,255,.2)'; ctx.lineWidth=1;
+    ctx.setLineDash([3,3]); ctx.beginPath(); ctx.moveTo(PAD.l,zeroY); ctx.lineTo(W-PAD.r,zeroY); ctx.stroke(); ctx.setLineDash([]);
+    values.forEach((v,i)=>{
+      const x=PAD.l+i*step+(step-barW)/2;
+      const top=v>=0?py(v):zeroY, h=Math.max(1,Math.abs(py(v)-zeroY));
+      ctx.fillStyle=v>=0?'rgba(34,197,94,.55)':'rgba(239,68,68,.55)';
+      ctx.fillRect(x,top,barW,h);
+    });
+  }
+
+  function redrawCharts(sessions) {
+    let running=0;
+    const cumPnL = sessions.map(s=>{ running+=(s.cashout-s.buyin); return running; });
+    const perSess = sessions.map(s=>s.cashout-s.buyin);
+    drawLineChart('chartPnL', cumPnL);
+    drawBarChart('chartSess', perSess);
+  }
+
+  // ── Equity Calculator ─────────────────────────────────────────
+  (function initEquity(){
+    const EQ_RANKS = ["A","K","Q","J","T","9","8","7","6","5","4","3","2"];
+    const EQ_SUITS = ["s","h","d","c"];
+    const EQ_SUIT_SYM = {s:"♠",h:"♥",d:"♦",c:"♣"};
+    const rNum = {A:12,K:11,Q:10,J:9,T:8,9:7,8:6,7:5,6:4,5:3,4:2,3:1,2:0};
+    const sNum = {s:0,h:1,d:2,c:3};
+
+    function fillR(el, req) {
+      el.innerHTML='';
+      if(!req){const o=document.createElement('option');o.value='';o.textContent='—';el.appendChild(o);}
+      EQ_RANKS.forEach(r=>{const o=document.createElement('option');o.value=r;o.textContent=r;el.appendChild(o);});
+    }
+    function fillS(el, req) {
+      el.innerHTML='';
+      if(!req){const o=document.createElement('option');o.value='';o.textContent='—';el.appendChild(o);}
+      EQ_SUITS.forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=EQ_SUIT_SYM[s];el.appendChild(o);});
+    }
+    ['eqR1','eqR2'].forEach(id=>fillR(document.getElementById(id),true));
+    ['eqS1','eqS2'].forEach(id=>fillS(document.getElementById(id),true));
+    ['bR1','bR2','bR3','bR4','bR5'].forEach(id=>fillR(document.getElementById(id),false));
+    ['bS1','bS2','bS3','bS4','bS5'].forEach(id=>fillS(document.getElementById(id),false));
+    document.getElementById('eqR1').value='A'; document.getElementById('eqS1').value='s';
+    document.getElementById('eqR2').value='K'; document.getElementById('eqS2').value='d';
+
+    function getCard(rId,sId){ const r=document.getElementById(rId).value, s=document.getElementById(sId).value; if(!r||!s) return null; return rNum[r]*4+sNum[s]; }
+
+    function evalFive(cards) {
+      const ranks=cards.map(c=>c>>2).sort((a,b)=>b-a), suits=cards.map(c=>c&3);
+      const isFlush=suits.every(s=>s===suits[0]);
+      let strHi=-1;
+      if(new Set(ranks).size===5){
+        if(ranks[0]-ranks[4]===4) strHi=ranks[0];
+        else if(ranks[0]===12&&ranks[1]===3&&ranks[2]===2&&ranks[3]===1&&ranks[4]===0) strHi=3;
+      }
+      const cnt={}; ranks.forEach(r=>cnt[r]=(cnt[r]||0)+1);
+      const grps=Object.entries(cnt).map(([r,c])=>[+r,+c]).sort((a,b)=>b[1]-a[1]||b[0]-a[0]);
+      const [r0,c0]=grps[0], [r1,c1]=grps[1]||[0,0];
+      const rest=ranks.filter(r=>r!==r0);
+      if(isFlush&&strHi>=0) return[8,strHi];
+      if(c0===4) return[7,r0,r1];
+      if(c0===3&&c1===2) return[6,r0,r1];
+      if(isFlush) return[5,...ranks];
+      if(strHi>=0) return[4,strHi];
+      if(c0===3){const k=rest.sort((a,b)=>b-a);return[3,r0,...k.slice(0,2)];}
+      if(c0===2&&c1===2){const p1=Math.max(r0,r1),p2=Math.min(r0,r1),k=ranks.find(r=>r!==r0&&r!==r1)??0;return[2,p1,p2,k];}
+      if(c0===2){const k=rest.sort((a,b)=>b-a);return[1,r0,...k.slice(0,3)];}
+      return[0,...ranks.slice(0,5)];
+    }
+    function bestHand(cards) {
+      const n=cards.length;
+      if(n===5) return evalFive(cards);
+      if(n===6){let best=null;for(let i=0;i<6;i++){const sc=evalFive(cards.filter((_,k)=>k!==i));if(!best||cmpH(sc,best)>0)best=sc;}return best;}
+      let best=null;
+      for(let i=0;i<6;i++) for(let j=i+1;j<7;j++){const sc=evalFive(cards.filter((_,k)=>k!==i&&k!==j));if(!best||cmpH(sc,best)>0)best=sc;}
+      return best;
+    }
+    function cmpH(a,b){for(let i=0;i<Math.max(a.length,b.length);i++){const ai=a[i]??-1,bi=b[i]??-1;if(ai!==bi)return ai>bi?1:-1;}return 0;}
+    function inRange(c1,c2,range){
+      const r1=Math.max(c1>>2,c2>>2),r2=Math.min(c1>>2,c2>>2),suited=(c1&3)===(c2&3),pair=r1===r2;
+      if(range==='premium') return (pair&&r1>=9)||(r1===12&&r2===11);
+      if(range==='strong')  return (pair&&r1>=7)||(r1===12&&r2>=8&&suited)||(r1===12&&r2>=10)||(r1===11&&r2===10&&suited);
+      if(range==='wide')    return pair||(r1>=8&&r2>=8)||(suited&&r1-r2<=1&&r1>=3)||(suited&&r1>=9);
+      return true;
+    }
+    function runMC(heroCards, boardCards, rangeName, iters) {
+      const used=new Set([...heroCards,...boardCards]);
+      const deck=[]; for(let c=0;c<52;c++) if(!used.has(c)) deck.push(c);
+      let heroW=0,tie=0,total=0;
+      for(let iter=0;iter<iters;iter++){
+        for(let j=deck.length-1;j>0;j--){const k=(Math.random()*(j+1))|0;[deck[j],deck[k]]=[deck[k],deck[j]];}
+        let v0=-1,v1=-1;
+        if(rangeName==='random'){v0=deck[0];v1=deck[1];}
+        else{
+          outer:for(let a=0;a<deck.length-1;a++){for(let b=a+1;b<deck.length;b++){if(inRange(deck[a],deck[b],rangeName)){v0=deck[a];v1=deck[b];[deck[a],deck[0]]=[deck[0],deck[a]];[deck[b],deck[1]]=[deck[1],deck[b]];break outer;}}}
+        }
+        if(v0<0) continue;
+        const need=5-boardCards.length, extra=deck.slice(2,2+need);
+        if(extra.length<need) continue;
+        const board=[...boardCards,...extra];
+        const hs=bestHand([...heroCards,...board]), vs=bestHand([v0,v1,...board]);
+        const cmp=cmpH(hs,vs); total++;
+        if(cmp>0) heroW++; else if(cmp===0) tie++;
+      }
+      if(!total) return null;
+      return{hero:((heroW+tie/2)/total*100).toFixed(1),villain:(((total-heroW-tie)+tie/2)/total*100).toFixed(1),tie:(tie/total*100).toFixed(1)};
+    }
+
+    document.getElementById('eqBtn').addEventListener('click',()=>{
+      const h1=getCard('eqR1','eqS1'),h2=getCard('eqR2','eqS2');
+      const resEl=document.getElementById('eqResult');
+      if(!h1||!h2){resEl.innerHTML='<p style="color:var(--red);padding:12px;">Please select both hole cards.</p>';return;}
+      if(h1===h2){resEl.innerHTML='<p style="color:var(--red);padding:12px;">Both cards cannot be the same.</p>';return;}
+      const board=[getCard('bR1','bS1'),getCard('bR2','bS2'),getCard('bR3','bS3'),getCard('bR4','bS4'),getCard('bR5','bS5')].filter(c=>c!==null);
+      const allCards=[h1,h2,...board];
+      if(new Set(allCards).size<allCards.length){resEl.innerHTML='<p style="color:var(--red);padding:12px;">Duplicate cards detected.</p>';return;}
+      const range=document.getElementById('eqRange').value;
+      const btn=document.getElementById('eqBtn'); btn.textContent='Running…'; btn.disabled=true;
+      setTimeout(()=>{
+        const res=runMC([h1,h2],board,range,1500);
+        btn.textContent='Run Simulation'; btn.disabled=false;
+        if(!res){resEl.innerHTML='<p style="color:var(--gold);padding:12px;">Not enough villain combos. Try a wider range.</p>';return;}
+        const hPct=parseFloat(res.hero);
+        const hColor=hPct>=55?'var(--accent)':hPct>=40?'var(--gold)':'var(--red)';
+        const boardDisplay=board.length?board.map(c=>EQ_RANKS[12-(c>>2)]+EQ_SUIT_SYM[EQ_SUITS[c&3]]).join(' '):'Preflop';
+        resEl.innerHTML=`
+          <div style="text-align:center;padding:18px 0 10px;">
+            <div style="font-size:48px;font-weight:800;color:${hColor};font-variant-numeric:tabular-nums;line-height:1;">${res.hero}%</div>
+            <div style="font-size:11px;color:var(--text-3);font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-top:4px;">Your equity</div>
+          </div>
+          <div style="height:10px;border-radius:5px;background:rgba(255,255,255,.08);overflow:hidden;display:flex;margin:4px 0 14px;">
+            <div style="background:var(--accent);width:${res.hero}%;height:100%;transition:width .5s;"></div>
+            <div style="background:var(--text-3);width:${res.tie}%;height:100%;"></div>
+            <div style="background:var(--red);width:${res.villain}%;height:100%;"></div>
+          </div>
+          <div class="stat-grid">
+            <div class="stat-box"><div class="val" style="color:${hColor};">${res.hero}%</div><div class="lbl">Hero</div></div>
+            <div class="stat-box"><div class="val ev-neg">${res.villain}%</div><div class="lbl">Villain</div></div>
+          </div>
+          <div style="margin-top:12px;padding:10px 12px;background:rgba(0,0,0,.25);border-radius:var(--r-md);border:1px solid var(--border);font-size:13px;color:var(--text-2);line-height:1.7;">
+            Board: <strong>${boardDisplay}</strong><br>Tie: ${res.tie}% · 1 500 iterations
+          </div>`;
+      },10);
+    });
+  })();
+
+  // ── Study inner tabs ──────────────────────────────────────────
+  (function initStudy(){
+    const tabs=document.querySelectorAll('.inner-tab');
+    tabs.forEach(btn=>{
+      btn.addEventListener('click',()=>{
+        const id=btn.dataset.inner;
+        tabs.forEach(t=>t.classList.toggle('active',t.dataset.inner===id));
+        document.querySelectorAll('.inner-panel').forEach(p=>p.classList.toggle('active',p.id==='inner-'+id));
+      });
+    });
+  })();
+</script>
+</body>
+</html>

@@ -37,6 +37,25 @@ Open the site, then "Add to Home Screen" (Safari share menu / Chrome menu). It
 launches full-screen, no browser chrome, and works with no signal — a service
 worker caches the app shell.
 
+## Poker Toolkit
+
+A second page — `toolkit.html`, reachable from the setup screen — bundles the
+study tools:
+
+- **BB Calc** — stack ÷ big blind, plus a stack-depth guide
+- **Ranges** — 13×13 preflop opening grid by table size, position, and stack depth
+- **Action** — rules-based preflop advisor (RFI / vs open / vs 3-bet)
+- **Odds & SPR** — pot odds, equity (rule of 2/4), EV, outs table, SPR
+- **Quiz** — range-drill flashcards, score saved locally
+- **Tracker** — a personal cash-game session log ($/hr, ROI, P&L charts); this is
+  distinct from the home-game buy-in tracker, but its amounts use the **same
+  currency** you picked there (`localStorage['poker.currency']`)
+- **Equity** — Monte-Carlo hand-vs-range equity
+- **Study** — bet sizing, blockers, MDF/alpha and other concepts
+
+Self-contained (`toolkit.html` + `src/money.js` + `src/state.js`), cached for
+offline like the rest of the app.
+
 ### Share links
 
 "Copy link" encodes the whole session into the URL after `#s=`. Anyone who opens

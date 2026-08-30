@@ -227,9 +227,12 @@ function viewSetup() {
   return [
     h('h1', { html: fx.icon('spade') + 'Poker Night' }),
     h('p', { class: 'muted' }, 'Track buy-ins, settle up clean at the end.'),
-    loadHistory().length
-      ? h('button', { class: 'ghost wide', html: fx.icon('trophy') + `History (${loadHistory().length})`, onclick: () => go('history') })
-      : null,
+    h('div', { class: 'btn-row' },
+      loadHistory().length
+        ? h('button', { class: 'ghost', html: fx.icon('trophy') + `History (${loadHistory().length})`, onclick: () => go('history') })
+        : null,
+      h('button', { class: 'ghost', html: fx.icon('spade') + 'Poker Toolkit', onclick: () => { location.href = 'toolkit.html'; } }),
+    ),
     h('h2', {}, 'Session'),
     h('label', {}, 'Name'),
     nameIn,
