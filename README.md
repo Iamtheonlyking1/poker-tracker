@@ -37,24 +37,26 @@ Open the site, then "Add to Home Screen" (Safari share menu / Chrome menu). It
 launches full-screen, no browser chrome, and works with no signal — a service
 worker caches the app shell.
 
-## Poker Toolkit
+## Home hub & poker tools
 
-A second page — `toolkit.html`, reachable from the setup screen — bundles the
-study tools:
+The app opens to a **Home hub**: "Start / Resume game" plus a grid of tool
+tiles. Every tool is a native screen in the same felt-and-gold theme with a
+back-to-home header; the live and cash-out screens have a small tools button so
+you can peek mid-game (the game autosaves). `toolkit.html` now just redirects
+here.
 
 - **BB Calc** — stack ÷ big blind, plus a stack-depth guide
-- **Ranges** — 13×13 preflop opening grid by table size, position, and stack depth
+- **Ranges** — 13×13 preflop opening grid by table size, position, stack depth
 - **Action** — rules-based preflop advisor (RFI / vs open / vs 3-bet)
 - **Odds & SPR** — pot odds, equity (rule of 2/4), EV, outs table, SPR
-- **Quiz** — range-drill flashcards, score saved locally
-- **Tracker** — a personal cash-game session log ($/hr, ROI, P&L charts); this is
-  distinct from the home-game buy-in tracker, but its amounts use the **same
-  currency** you picked there (`localStorage['poker.currency']`)
-- **Equity** — Monte-Carlo hand-vs-range equity
+- **Range Quiz** — flashcards, score saved locally
+- **Equity** — Monte-Carlo hand-vs-range equity (1,500 sims, in-browser)
 - **Study** — bet sizing, blockers, MDF/alpha and other concepts
+- **My Sessions** — a personal cash-game log ($/hr, ROI, P&L charts) in the
+  currency you picked for the game
 
-Self-contained (`toolkit.html` + `src/money.js` + `src/state.js`), cached for
-offline like the rest of the app.
+Old `ptk_sessions` / `ptk_quiz` localStorage data from the standalone toolkit is
+migrated on first load.
 
 ### Share links
 
@@ -84,14 +86,17 @@ npm run serve   # python3 -m http.server 8000, open http://localhost:8000
 |------|------|
 | `index.html` | single page, loads the module graph + registers the service worker |
 | `src/settle.js` | net calc + settlement algorithm (pure, unit-tested) |
-| `src/state.js` | session model, localStorage, undo stack, currency preference |
+| `src/poker.js` | ranges, action advisor, odds/SPR math, MC equity (pure, unit-tested) |
+| `src/state.js` | session model, localStorage, undo, currency pref, session log, quiz score |
 | `src/money.js` | active-currency formatting + world currency list (`Intl`) |
 | `src/share.js` | URL snapshot encode/decode, WhatsApp/plain-text summary |
 | `src/ui.js` | presentation helpers (`h`, avatars, formatting) |
 | `src/fx.js` | SVG icons, motion, haptics — all gated on `prefers-reduced-motion` |
-| `src/app.js` | views + event wiring + render loop |
+| `src/charts.js` | tiny canvas P&L charts for the session log |
+| `src/tools.js` | the 8 study-tool views + Home hub |
+| `src/app.js` | game views + render loop + navigation |
 | `manifest.json`, `sw.js`, `icon-*.png` | PWA / offline |
-| `tests/settle.test.js` | `node --test` suite |
+| `tests/*.test.js` | `node --test` suites (settlement + poker logic) |
 
 ## Deploy / redeploy (GitHub Pages)
 

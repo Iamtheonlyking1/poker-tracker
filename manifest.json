@@ -11,9 +11,9 @@
   "categories": ["utilities", "finance"],
   "shortcuts": [
     {
-      "name": "Poker Toolkit",
-      "short_name": "Toolkit",
-      "url": "./toolkit.html",
+      "name": "Poker Tools",
+      "short_name": "Tools",
+      "url": "./#tools",
       "description": "Ranges, odds, equity, range quiz"
     }
   ],

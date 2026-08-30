@@ -23,12 +23,14 @@ import { summaryText, shareUrl, whatsappUrl, sessionFromUrl } from './share.js';
 import { fmtMoney, setCurrency, currencyName, currencySymbol, allCurrencies } from './money.js';
 import { h, escapeHtml, fmtNet, netCount, avatar, fmtDuration } from './ui.js';
 import * as fx from './fx.js';
+import { setNav, TOOL_VIEWS } from './tools.js';
 
 const app = document.getElementById('app');
 
-// view: 'setup' | 'live' | 'cashout' | 'results' | 'history' | 'shared'
+// view: 'home' | 'setup' | 'live' | 'cashout' | 'results' | 'history' | 'shared'
+//     | 'bbcalc' | 'ranges' | 'action' | 'odds' | 'quiz' | 'equity' | 'study' | 'sessions'
 let state = {
-  view: 'setup',
+  view: 'home',
   session: null,
   shared: null,
   buyInPresets: [100, 200, 500, 1000],
@@ -225,14 +227,11 @@ function viewSetup() {
   });
 
   return [
-    h('h1', { html: fx.icon('spade') + 'Poker Night' }),
-    h('p', { class: 'muted' }, 'Track buy-ins, settle up clean at the end.'),
-    h('div', { class: 'btn-row' },
-      loadHistory().length
-        ? h('button', { class: 'ghost', html: fx.icon('trophy') + `History (${loadHistory().length})`, onclick: () => go('history') })
-        : null,
-      h('button', { class: 'ghost', html: fx.icon('spade') + 'Poker Toolkit', onclick: () => { location.href = 'toolkit.html'; } }),
+    h('div', { class: 'tool-head' },
+      h('button', { class: 'sm ghost icon-only', 'aria-label': 'Home', html: fx.icon('home'), onclick: () => go('home') }),
+      h('h1', { html: fx.icon('spade') + 'New game' }),
     ),
+    h('p', { class: 'muted' }, 'Track buy-ins, settle up clean at the end.'),
     h('h2', {}, 'Session'),
     h('label', {}, 'Name'),
     nameIn,
@@ -340,7 +339,13 @@ function viewLive() {
   });
 
   return [
-    h('div', { class: 'head-row' }, h('h1', {}, s.name), elapsedPill(s)),
+    h('div', { class: 'head-row' },
+      h('h1', {}, s.name),
+      h('div', { class: 'hr-actions' },
+        h('button', { class: 'sm ghost icon-only', 'aria-label': 'Tools', html: fx.icon('grid'), onclick: () => go('home') }),
+        elapsedPill(s),
+      ),
+    ),
     topbar(s),
     h('div', { class: 'subbar' },
       h('button', {
@@ -428,7 +433,13 @@ function viewCashout() {
   refresh();
 
   return [
-    h('div', { class: 'head-row' }, h('h1', {}, 'Cash out'), elapsedPill(s)),
+    h('div', { class: 'head-row' },
+      h('h1', {}, 'Cash out'),
+      h('div', { class: 'hr-actions' },
+        h('button', { class: 'sm ghost icon-only', 'aria-label': 'Tools', html: fx.icon('grid'), onclick: () => go('home') }),
+        elapsedPill(s),
+      ),
+    ),
     banner,
     h('div', { class: 'cards' }, ...cards),
     h('div', { class: 'actionbar' },
@@ -610,7 +621,8 @@ function viewHistory() {
   }
 
   out.push(h('div', { class: 'actionbar' },
-    h('button', { class: 'primary wide',
+    h('button', { class: 'ghost', html: fx.icon('home') + 'Home', onclick: () => go('home') }),
+    h('button', { class: 'primary',
       html: (state.session ? fx.icon('back') + 'Back to game' : fx.icon('spade') + 'New game'),
       onclick: () => go(state.session ? 'live' : 'setup') }),
   ));
@@ -620,13 +632,15 @@ function viewHistory() {
 // ---------- render ----------
 
 function nodesFor(view) {
+  if (TOOL_VIEWS[view]) return TOOL_VIEWS[view]();
   switch (view) {
+    case 'setup': return viewSetup();
     case 'live': return viewLive();
     case 'cashout': return viewCashout();
     case 'results': return viewResults();
     case 'history': return viewHistory();
     case 'shared': return viewShared();
-    default: return viewSetup();
+    default: return TOOL_VIEWS.home();
   }
 }
 
@@ -683,16 +697,19 @@ function boot() {
     go('shared');
     return;
   }
+  const wantsTools = location.hash === '#tools';
   const active = loadActive();
   if (active && active.players.length) {
     state.session = active;
     setCurrency(active.currency || 'INR');
+    if (wantsTools) { go('home'); return; }
     const anyCashOut = active.players.some((p) => p.cashOut != null);
     go(anyCashOut ? 'cashout' : 'live');
     return;
   }
   setCurrency(loadCurrencyPref());
-  go('setup');
+  go('home');
 }
 
+setNav({ go, toast, state });
 boot();

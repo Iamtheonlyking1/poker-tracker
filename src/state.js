@@ -130,6 +130,61 @@ export function deleteFromHistory(id) {
   return hist;
 }
 
+// ---- cash-game session ledger (the "My Sessions" tool) ----
+
+const SESSIONLOG_KEY = 'poker.sessionlog';
+const QUIZ_KEY = 'poker.quiz';
+
+function readJSON(key, fallback) {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch (e) {
+    return fallback;
+  }
+}
+function writeJSON(key, val) {
+  try {
+    localStorage.setItem(key, JSON.stringify(val));
+  } catch (e) {}
+}
+
+// one-time migration from the standalone toolkit.html keys
+function migrate(oldKey, newKey) {
+  try {
+    if (localStorage.getItem(newKey) == null && localStorage.getItem(oldKey) != null) {
+      localStorage.setItem(newKey, localStorage.getItem(oldKey));
+    }
+  } catch (e) {}
+}
+
+export function loadSessionLog() {
+  migrate('ptk_sessions', SESSIONLOG_KEY);
+  return readJSON(SESSIONLOG_KEY, []);
+}
+
+export function addSessionLog(entry) {
+  const list = loadSessionLog();
+  list.push({ ...entry, id: Date.now() });
+  writeJSON(SESSIONLOG_KEY, list);
+  return list;
+}
+
+export function deleteSessionLog(id) {
+  const list = loadSessionLog().filter((s) => s.id !== id);
+  writeJSON(SESSIONLOG_KEY, list);
+  return list;
+}
+
+export function loadQuizScore() {
+  migrate('ptk_quiz', QUIZ_KEY);
+  return readJSON(QUIZ_KEY, { correct: 0, total: 0, wrong: 0, streak: 0 });
+}
+
+export function saveQuizScore(score) {
+  writeJSON(QUIZ_KEY, score);
+}
+
 // ---- undo ----
 
 export function pushUndo(session) {
