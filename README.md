@@ -77,6 +77,8 @@ here.
 - **Odds & SPR** — pot odds, equity (rule of 2/4), EV, outs table, SPR
 - **Range Quiz** — flashcards, score saved locally
 - **Equity** — Monte-Carlo hand-vs-range equity (1,500 sims, in-browser)
+- **ICM / Chop** — fair split of a prize pool by chip stacks (Malmuth–Harville),
+  standalone or "Load" from a running tournament
 - **Study** — bet sizing, blockers, MDF/alpha and other concepts
 - **My Sessions** — a personal cash-game log ($/hr, ROI, P&L charts) in the
   currency you picked for the game

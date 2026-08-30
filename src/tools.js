@@ -17,7 +17,7 @@ import {
   upsertRosterPlayer,
   deleteRosterPlayer,
 } from './state.js';
-import { sessionNets } from './tournament.js';
+import { sessionNets, icmEquities, payouts as tPayouts, prizePool as tPrizePool } from './tournament.js';
 import { exportBlob, importAll, summarize, markExported } from './backup.js';
 
 // ---------- controller hook (set once by app.js to avoid a circular import) ----------
@@ -129,6 +129,7 @@ const TILES = [
   ['odds', 'percent', 'Odds & SPR', 'Pot odds, equity, SPR'],
   ['quiz', 'dice', 'Range Quiz', 'Drill your ranges'],
   ['equity', 'graph', 'Equity', 'Hand vs range'],
+  ['icm', 'scale', 'ICM / Chop', 'Fair split by chip stacks'],
   ['study', 'book', 'Study', 'Sizing, blockers, theory'],
   ['sessions', 'ledger', 'My Sessions', 'Personal cash-game log'],
   ['data', 'database', 'Data', 'Back up & restore'],
@@ -969,6 +970,117 @@ export function viewPlayerStats(name) {
   ];
 }
 
+// ---------- ICM / chop ----------
+
+const ordWord = (n) => n + (['th', 'st', 'nd', 'rd'][((n % 100) - 20) % 10] || ['th', 'st', 'nd', 'rd'][n % 100] || 'th');
+
+export function viewICM() {
+  const s = nav.state.session;
+  const tournActive = !!(s && s.type === 'tournament');
+
+  const st = nav.state.icm || (nav.state.icm = {
+    prizes: [1000, 600, 400],
+    players: [{ name: '', stack: '' }, { name: '', stack: '' }, { name: '', stack: '' }],
+  });
+  let { prizes, players } = st;
+
+  const result = h('div', {});
+  const compute = () => {
+    const P = prizes.map((x) => parseInt(x, 10) || 0).filter((x) => x > 0);
+    const rows = players.filter((p) => (parseInt(p.stack, 10) || 0) > 0);
+    if (rows.length < 2 || !P.length) {
+      result.replaceChildren(h('p', { class: 'muted empty' }, 'Enter at least 2 stacks and one prize.'));
+      return;
+    }
+    const stacks = rows.map((p) => parseInt(p.stack, 10));
+    const eq = icmEquities(stacks, P);
+    const pool = P.reduce((a, b) => a + b, 0);
+    const even = Math.round(pool / rows.length);
+    const t = h('table', { class: 'ref-table' });
+    t.append(h('tr', {}, h('th', {}, 'Player'), h('th', {}, 'Stack'), h('th', {}, 'Fair chop'), h('th', {}, 'vs even')));
+    rows.forEach((p, i) => {
+      const amt = Math.round(eq[i]);
+      const d = amt - even;
+      t.append(h('tr', {},
+        h('td', { class: 'rt-key' }, p.name || `P${i + 1}`),
+        h('td', {}, stacks[i].toLocaleString('en-IN')),
+        h('td', {}, fmtMoney(amt)),
+        h('td', { class: d === 0 ? '' : d > 0 ? 'net-win' : 'net-loss' }, d === 0 ? '—' : (d > 0 ? '+' : '−') + fmtMoney(Math.abs(d))),
+      ));
+    });
+    result.replaceChildren(
+      h('div', { class: 'pmeta center' }, `Pool ${fmtMoney(pool)} · ${rows.length} players`),
+      h('div', { class: 'scroll-x' }, t),
+      h('p', { class: 'muted small' }, 'Fair chop = Malmuth–Harville ICM equity. Rounded — nudge by a unit or two so it sums exactly.'),
+    );
+    fx.haptic(10);
+  };
+
+  const prizeList = h('div', {});
+  const renderPrizes = () => {
+    prizeList.replaceChildren(...prizes.map((v, i) =>
+      h('div', { class: 'kitty-row' },
+        h('span', { class: 'kr-name' }, ordWord(i + 1) + ' place'),
+        h('input', { type: 'number', inputmode: 'numeric', class: 'sm', style: 'width:110px', value: v,
+          oninput: (e) => { prizes[i] = e.target.value; } }),
+        h('button', { class: 'sm danger icon-only', 'aria-label': 'Remove', html: fx.icon('close'),
+          onclick: () => { prizes.splice(i, 1); renderPrizes(); } }),
+      )));
+  };
+  renderPrizes();
+
+  const playerList = h('div', {});
+  const renderPlayers = () => {
+    playerList.replaceChildren(...players.map((p, i) =>
+      h('div', { class: 'kitty-row' },
+        h('input', { type: 'text', class: 'sm', placeholder: 'Name', value: p.name, style: 'flex:1;min-width:0;text-align:left',
+          oninput: (e) => { p.name = e.target.value; } }),
+        h('input', { type: 'number', inputmode: 'numeric', class: 'sm', placeholder: 'chips', style: 'width:92px', value: p.stack,
+          oninput: (e) => { p.stack = e.target.value; } }),
+        h('button', { class: 'sm danger icon-only', 'aria-label': 'Remove', html: fx.icon('close'),
+          onclick: () => { players.splice(i, 1); renderPlayers(); } }),
+      )));
+  };
+  renderPlayers();
+
+  return [
+    toolHead('ICM / Chop'),
+    tournActive
+      ? h('div', { class: 'card' },
+          h('div', { class: 'row' },
+            h('b', {}, 'From your tournament'),
+            h('button', { class: 'sm primary', html: fx.icon('download') + 'Load', onclick: () => {
+              const pay = tPayouts(s);
+              const stillIn = s.players.filter((x) => x.finish == null);
+              nav.state.icm = {
+                prizes: pay.map((r) => r.amount),
+                players: stillIn.map((x) => ({
+                  name: x.name,
+                  stack: String(x.entries.reduce((a, e) => a + (e.chips || 0), 0)),
+                })),
+              };
+              nav.render();
+            } }),
+          ),
+          h('p', { class: 'muted small' }, `${s.players.filter((p) => p.finish == null).length} still in · pool ${fmtMoney(tPrizePool(s))} — stacks are your entry chips, edit to your real counts`),
+        )
+      : null,
+    h('div', { class: 'card' },
+      h('h2', {}, 'Prizes'),
+      prizeList,
+      h('button', { class: 'sm ghost', html: fx.icon('plus') + 'Prize', onclick: () => { prizes.push(0); renderPrizes(); } }),
+    ),
+    h('div', { class: 'card' },
+      h('h2', {}, 'Players & stacks'),
+      playerList,
+      h('button', { class: 'sm ghost', html: fx.icon('plus') + 'Player', onclick: () => { players.push({ name: '', stack: '' }); renderPlayers(); } }),
+    ),
+    h('button', { class: 'primary wide', html: 'Calculate chop', onclick: compute }),
+    result,
+    backbar(),
+  ];
+}
+
 // ---------- Data (backup / restore) ----------
 
 export function viewData() {
@@ -1048,6 +1160,7 @@ export const TOOL_VIEWS = {
   roster: viewRoster,
   data: viewData,
   playerstats: () => viewPlayerStats(nav.state.statsPlayer),
+  icm: viewICM,
   bbcalc: viewBBCalc,
   ranges: viewRanges,
   action: viewAction,
