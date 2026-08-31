@@ -126,18 +126,33 @@ export const auth = {
     await req('/auth/v1/otp', {
       method: 'POST',
       auth: false,
-      body: { email, create_user: true },
+      body: { email, create_user: true, should_create_user: true },
     });
   },
 
-  /** Exchange the 6-digit code for a session. */
+  /**
+   * Exchange the 6-digit code for a session. Whether the OTP is minted as
+   * 'email', 'magiclink' or 'signup' depends on server config, so try each.
+   */
   async verifyOtp(email, token) {
-    const data = await req('/auth/v1/verify', {
-      method: 'POST',
-      auth: false,
-      body: { type: 'email', email, token },
-    });
-    return storeTokenResponse(data);
+    const clean = String(token || '').replace(/\s/g, '');
+    let lastErr;
+    for (const type of ['email', 'magiclink', 'signup']) {
+      try {
+        const data = await req('/auth/v1/verify', {
+          method: 'POST',
+          auth: false,
+          body: { type, email, token: clean },
+        });
+        return storeTokenResponse(data);
+      } catch (e) {
+        lastErr = e;
+        // 400/401/403/404 = "wrong type or bad code" — try the next type;
+        // anything else (network, 500) is a real failure
+        if (![400, 401, 403, 404, 422].includes(e.status)) throw e;
+      }
+    }
+    throw lastErr;
   },
 
   async signInWithPassword(email, password) {
