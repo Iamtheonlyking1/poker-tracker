@@ -1,0 +1,89 @@
+/* Shared styling for the Poker Night legal pages. Self-contained, no build. */
+:root {
+  --bg: #08130d;
+  --surface: #12211a;
+  --border: #2a3b31;
+  --text: #f3efe2;
+  --muted: #b9c4b6;
+  --gold: #e7bd5c;
+  --gold-deep: #c99f43;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.65 -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  padding: 0 20px 96px;
+}
+.wrap { max-width: 760px; margin: 0 auto; }
+header {
+  padding: 40px 0 8px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 32px;
+}
+header .brand {
+  color: var(--gold);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-size: 0.8rem;
+}
+h1 {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 2rem;
+  margin: 10px 0 6px;
+}
+.updated { color: var(--muted); font-size: 0.9rem; margin: 0; }
+h2 {
+  font-family: Georgia, serif;
+  color: var(--gold);
+  font-size: 1.25rem;
+  margin: 40px 0 10px;
+  scroll-margin-top: 16px;
+}
+h3 { font-size: 1.03rem; margin: 24px 0 6px; }
+a { color: var(--gold); }
+strong { color: #fff; }
+ul, ol { padding-left: 22px; }
+li { margin: 4px 0; }
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 14px 0;
+  font-size: 0.94rem;
+}
+th, td {
+  border: 1px solid var(--border);
+  padding: 8px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+th { background: var(--surface); color: var(--gold); }
+.note {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--gold-deep);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin: 18px 0;
+  font-size: 0.95rem;
+  color: var(--muted);
+}
+.placeholder {
+  background: rgba(231, 189, 92, 0.16);
+  color: var(--gold);
+  padding: 0 4px;
+  border-radius: 3px;
+  font-weight: 600;
+}
+.toc { font-size: 0.95rem; }
+.toc a { text-decoration: none; }
+footer {
+  margin-top: 56px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 0.88rem;
+}

@@ -1,0 +1,429 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Privacy Policy — Poker Night</title>
+    <meta name="robots" content="index, follow" />
+    <link rel="stylesheet" href="_shared.css" />
+  </head>
+  <body>
+    <div class="wrap">
+      <header>
+        <div class="brand">♠ Poker Night</div>
+        <h1>Privacy Policy</h1>
+        <p class="updated">
+          Last updated: <span class="placeholder">[EFFECTIVE DATE]</span> &nbsp;·&nbsp;
+          Version 1.0
+        </p>
+      </header>
+
+      <div class="note">
+        <strong>Draft for legal review.</strong> Not reviewed by a lawyer. Check
+        against the Digital Personal Data Protection Act 2023 and its Rules (once
+        notified), the IT Act 2000 and the IT (Reasonable Security Practices)
+        Rules 2011, and — if you have users there — the EU/UK GDPR and other
+        applicable laws. Confirm every third party, data location, and retention
+        period below is accurate for your actual setup before publishing.
+      </div>
+
+      <p>
+        This Privacy Policy explains what personal data
+        <span class="placeholder">[LEGAL ENTITY NAME]</span>
+        (<strong>"we"</strong>, <strong>"us"</strong>) collects when you use
+        Poker Night (the <strong>"Service"</strong>), why, who we share it with,
+        how long we keep it, and the rights you have. It forms part of our
+        <a href="terms.html">Terms of Service</a>.
+      </p>
+
+      <h2 id="tldr">1. The short version</h2>
+      <ul>
+        <li><strong>No account = nothing leaves your device.</strong> Without an
+          account, all your games and notes are stored only in your browser's
+          local storage. We never receive them.</li>
+        <li>An account stores your email and syncs your data to our servers so
+          you can use it on more than one device.</li>
+        <li>We use a small number of processors: a hosting/database provider, a
+          payment processor, an AI provider (only when you use an AI feature),
+          and a website host/CDN.</li>
+        <li>We do not sell your data, do not run advertising, and do not use
+          your content to train AI models.</li>
+        <li>You can export or delete your data at any time.</li>
+      </ul>
+
+      <h2 id="controller">2. Who is responsible for your data</h2>
+      <p>
+        The <strong>Data Fiduciary</strong> (controller) for personal data
+        processed through your account is:
+      </p>
+      <p>
+        <span class="placeholder">[LEGAL ENTITY NAME]</span><br />
+        <span class="placeholder">[REGISTERED ADDRESS]</span><br />
+        Email: <span class="placeholder">[CONTACT EMAIL]</span>
+      </p>
+      <p>
+        Where you enter information about <em>other people</em> (the players in
+        your game — their names, notes, results), you are the fiduciary for that
+        information and we act as a <strong>Data Processor</strong> on your
+        instructions. See section 9.
+      </p>
+
+      <h2 id="what">3. What we collect</h2>
+
+      <h3>3.1 If you use Poker Night without an account</h3>
+      <p>
+        Your games, results, player names and notes, custom ranges, tournament
+        structures, and settings are stored in your browser using
+        <code>localStorage</code> on your device. <strong>This data is not
+        transmitted to us.</strong> The website is served as static files; our
+        host may log standard technical request data (see 3.4).
+      </p>
+
+      <h3>3.2 Account data</h3>
+      <table>
+        <tr><th>Data</th><th>Why</th></tr>
+        <tr>
+          <td>Email address</td>
+          <td>To create your account, sign you in (one-time codes / links),
+            send service and billing notices, and respond to support.</td>
+        </tr>
+        <tr>
+          <td>Display name and (optional) avatar</td>
+          <td>To show who you are in shared games and on your account screen.</td>
+        </tr>
+        <tr>
+          <td>Sign-in method identifiers (if you use Google or Apple sign-in)</td>
+          <td>To link your login to your account. We receive a stable identifier
+            and your email/name from the provider; we do not receive your
+            password.</td>
+        </tr>
+        <tr>
+          <td>A device identifier we generate</td>
+          <td>To sync reliably across your devices and resolve conflicts. It is
+            not linked to any hardware ID and stays on the device.</td>
+        </tr>
+      </table>
+
+      <h3>3.3 Content you sync</h3>
+      <p>
+        When you have an account, the data described in 3.1 is copied to our
+        servers so it is available on your other devices and can be restored.
+        This includes anything you choose to type in: game names, buy-in and
+        cash-out amounts, chip counts, settlement records, tournament data, and
+        <strong>free-text notes about players</strong>. Only put information here
+        that you are comfortable storing and that you are entitled to record
+        about other people.
+      </p>
+
+      <h3>3.4 Technical and usage data</h3>
+      <ul>
+        <li><strong>Log data</strong> from our website host and backend: IP
+          address, approximate location derived from it, browser and device
+          type, pages/endpoints accessed, timestamps, and referrer. Used for
+          security, abuse prevention, debugging, and understanding load.</li>
+        <li><strong>Error reports</strong>: if the app hits an error, it may
+          send us a diagnostic record (error message, a stack trace, the app
+          version, and coarse context such as which screen you were on). We aim
+          to keep personal data out of these; occasionally a note or name could
+          appear in a stack trace.</li>
+        <li><strong>Feature usage counters</strong> needed to enforce plan
+          limits and meter AI usage (for example, how many games are synced, how
+          many AI requests you have made this month).</li>
+      </ul>
+
+      <h3>3.5 Payment data</h3>
+      <p>
+        If you subscribe to Pro, payment is processed by
+        <strong>Razorpay</strong>. Razorpay collects and processes your card,
+        UPI, or bank details directly — <strong>we do not see or store your full
+        payment details</strong>. We receive from Razorpay a payment/subscription
+        identifier, the status, the amount, the last 4 digits or payment-method
+        type, and the billing contact you provide, which we keep for accounting,
+        tax, and fraud-prevention purposes.
+      </p>
+
+      <h3>3.6 AI feature inputs</h3>
+      <p>
+        If you use an AI feature (for example, "ask the coach about this hand"),
+        the specific information you submit for that request — such as the hand
+        history you paste or select — is sent to <strong>Anthropic</strong> to
+        generate a response. See section 6.
+      </p>
+
+      <h2 id="why">4. Why we process your data and our legal basis</h2>
+      <table>
+        <tr><th>Purpose</th><th>Basis (DPDP / GDPR where relevant)</th></tr>
+        <tr>
+          <td>Create and operate your account; sync and restore your data</td>
+          <td>Performance of our contract with you / necessary for the specified
+            purpose you signed up for</td>
+        </tr>
+        <tr>
+          <td>Process payments, issue invoices, prevent payment fraud</td>
+          <td>Contract; legal obligation (tax and accounting law)</td>
+        </tr>
+        <tr>
+          <td>Provide support and respond to your requests</td>
+          <td>Contract; your request</td>
+        </tr>
+        <tr>
+          <td>Keep the Service secure; detect and prevent abuse</td>
+          <td>Our legitimate interest / legitimate use in a secure Service</td>
+        </tr>
+        <tr>
+          <td>Fix bugs and improve the Service using aggregated, de-identified
+            data</td>
+          <td>Legitimate interest</td>
+        </tr>
+        <tr>
+          <td>Send service messages (security, billing, material changes)</td>
+          <td>Contract; legal obligation</td>
+        </tr>
+        <tr>
+          <td>Send optional product updates or tips, if we ever offer them</td>
+          <td>Your consent — you can withdraw it any time</td>
+        </tr>
+        <tr>
+          <td>Run an AI feature you invoke</td>
+          <td>Your request / consent for that feature</td>
+        </tr>
+      </table>
+
+      <h2 id="sharing">5. Who we share data with</h2>
+      <p>
+        We do not sell personal data and do not share it for advertising. We use
+        the following processors, each under a contract that limits them to
+        processing data on our instructions:
+      </p>
+      <table>
+        <tr><th>Provider</th><th>Role</th><th>Data</th><th>Location</th></tr>
+        <tr>
+          <td>Supabase</td>
+          <td>Database, authentication, file storage, backend hosting</td>
+          <td>All account data and synced content</td>
+          <td><span class="placeholder">[SUPABASE REGION — e.g. Mumbai / Singapore]</span></td>
+        </tr>
+        <tr>
+          <td>Cloudflare</td>
+          <td>Website hosting, CDN, DDoS protection</td>
+          <td>Technical request/log data</td>
+          <td>Global edge network</td>
+        </tr>
+        <tr>
+          <td>Razorpay</td>
+          <td>Payment processing for Pro subscriptions</td>
+          <td>Payment details you enter with them; billing contact</td>
+          <td>India</td>
+        </tr>
+        <tr>
+          <td>Anthropic</td>
+          <td>AI model provider for AI features</td>
+          <td>Only the content you submit to an AI feature, plus a request
+            identifier</td>
+          <td><span class="placeholder">[US / as per Anthropic]</span></td>
+        </tr>
+        <tr>
+          <td>Google / Apple</td>
+          <td>Optional sign-in providers</td>
+          <td>Only if you choose that sign-in method</td>
+          <td>Global</td>
+        </tr>
+        <tr>
+          <td><span class="placeholder">[EMAIL DELIVERY PROVIDER, if separate]</span></td>
+          <td>Sending sign-in codes and service emails</td>
+          <td>Your email address and message content</td>
+          <td><span class="placeholder">[REGION]</span></td>
+        </tr>
+      </table>
+      <p>We may also disclose data:</p>
+      <ul>
+        <li>to comply with a valid legal request, court order, or law;</li>
+        <li>to enforce our Terms or protect the rights, safety, or property of
+          us, our users, or the public;</li>
+        <li>to a successor entity in a merger, acquisition, or sale of assets,
+          under confidentiality obligations and with notice to you.</li>
+      </ul>
+
+      <h2 id="ai-detail">6. More about AI features</h2>
+      <ul>
+        <li>AI features are optional and only run when you trigger them.</li>
+        <li>The content you submit is transmitted to Anthropic's API to generate
+          a response and is returned to you. We keep a short record that a
+          request was made (for metering and support) and may retain the
+          request and response for a limited period to investigate abuse and
+          improve prompts.</li>
+        <li>Per Anthropic's API terms, your inputs and outputs are
+          <strong>not used to train their models</strong>. Anthropic may retain
+          data briefly for trust-and-safety purposes as described in its
+          policies.</li>
+        <li>Do not submit sensitive personal data, other people's personal data,
+          or confidential information into AI features.</li>
+      </ul>
+
+      <h2 id="transfers">7. International transfers</h2>
+      <p>
+        Some processors listed above store or process data outside India (for
+        example, Anthropic in the United States, and possibly Supabase or the
+        email provider depending on the region selected). Where we transfer
+        personal data across borders, we do so in accordance with the DPDP Act
+        and, for data subject to the GDPR, under appropriate safeguards such as
+        Standard Contractual Clauses. By using the Service you understand that
+        your data may be processed in these locations.
+      </p>
+
+      <h2 id="retention">8. How long we keep data</h2>
+      <table>
+        <tr><th>Data</th><th>Retention</th></tr>
+        <tr>
+          <td>Account and synced content</td>
+          <td>While your account is active. Deleted within
+            <span class="placeholder">[e.g. 30]</span> days of you deleting your
+            account, except items subject to a longer period below.</td>
+        </tr>
+        <tr>
+          <td>Backups</td>
+          <td>Rolling backups are retained for up to
+            <span class="placeholder">[e.g. 30]</span> days and then overwritten;
+            deleted data disappears from backups within that window.</td>
+        </tr>
+        <tr>
+          <td>Payment and invoice records</td>
+          <td>Up to <strong>8 years</strong> as required by Indian tax and
+            company law. These are pseudonymised where possible after your
+            account is closed.</td>
+        </tr>
+        <tr>
+          <td>Server and security logs</td>
+          <td>Typically <span class="placeholder">[e.g. 30–90]</span> days,
+            longer if needed for an active security investigation.</td>
+        </tr>
+        <tr>
+          <td>AI request records</td>
+          <td><span class="placeholder">[e.g. 30–90]</span> days for abuse
+            monitoring, then deleted or aggregated.</td>
+        </tr>
+        <tr>
+          <td>Support correspondence</td>
+          <td><span class="placeholder">[e.g. 2 years]</span> from the last
+            contact.</td>
+        </tr>
+        <tr>
+          <td>Local data on your device</td>
+          <td>Stays until you clear it, sign out (which wipes it from that
+            device), or your browser evicts it.</td>
+        </tr>
+      </table>
+
+      <h2 id="your-rights">9. Your rights</h2>
+      <p>Subject to applicable law, you can ask us to:</p>
+      <ul>
+        <li><strong>Access</strong> the personal data we hold about you and get
+          a summary of how it is processed and shared;</li>
+        <li><strong>Correct or update</strong> inaccurate or incomplete data;</li>
+        <li><strong>Erase</strong> your data and close your account;</li>
+        <li><strong>Export</strong> your data — you can do this yourself at any
+          time from the app's backup/export feature;</li>
+        <li><strong>Withdraw consent</strong> for any processing based on
+          consent (this does not affect processing already carried out);</li>
+        <li><strong>Nominate</strong> another individual to exercise your rights
+          in the event of your death or incapacity (DPDP Act);</li>
+        <li><strong>Object to</strong> or restrict certain processing, and,
+          where the GDPR applies, complain to a supervisory authority.</li>
+      </ul>
+      <p>
+        To make a request, email
+        <span class="placeholder">[GRIEVANCE / DPO EMAIL]</span>. We will respond
+        within the timeframe required by law (and in any case aim for
+        <span class="placeholder">[e.g. 30 days]</span>). We may need to verify
+        your identity first. There is no fee unless the request is manifestly
+        unfounded or excessive.
+      </p>
+      <p>
+        <strong>Requests about another person's data you entered:</strong> if
+        someone contacts us about information a Poker Night user recorded about
+        them, we will refer them to that user (the fiduciary) and help facilitate
+        the request as processor.
+      </p>
+
+      <h2 id="grievance">10. Grievance Officer</h2>
+      <p>
+        In accordance with the DPDP Act and the IT Rules, our Grievance Officer
+        is:
+      </p>
+      <p>
+        <span class="placeholder">[GRIEVANCE OFFICER NAME]</span><br />
+        <span class="placeholder">[LEGAL ENTITY NAME]</span><br />
+        <span class="placeholder">[REGISTERED ADDRESS]</span><br />
+        Email: <span class="placeholder">[GRIEVANCE OFFICER EMAIL]</span><br />
+        We aim to acknowledge grievances within
+        <span class="placeholder">[e.g. 48 hours]</span> and resolve them within
+        <span class="placeholder">[e.g. 30 days]</span>.
+      </p>
+      <p>
+        If you are not satisfied with our response, you may escalate to the Data
+        Protection Board of India (once operational) or the relevant authority
+        in your jurisdiction.
+      </p>
+
+      <h2 id="security">11. How we protect data</h2>
+      <ul>
+        <li>Data in transit is encrypted with TLS. Data at rest in our database
+          and backups is encrypted by our hosting provider.</li>
+        <li>Access to production data is limited to people who need it, protected
+          by authentication and, where available, row-level security so one
+          account cannot read another's data.</li>
+        <li>Payment details are handled by a PCI-DSS-compliant processor, not by
+          us.</li>
+        <li>We keep dependencies updated and follow reasonable secure-development
+          practices.</li>
+        <li>No system is perfectly secure. If a data breach occurs that is
+          likely to cause you harm, we will notify you and the relevant
+          authority as required by law.</li>
+      </ul>
+
+      <h2 id="children">12. Children</h2>
+      <p>
+        The Service is intended for adults (18+) and is not directed at
+        children. We do not knowingly collect personal data from anyone under
+        18. If you believe a minor has provided us data, contact us and we will
+        delete it.
+      </p>
+
+      <h2 id="cookies">13. Cookies and local storage</h2>
+      <ul>
+        <li>We use <code>localStorage</code> and similar browser storage to make
+          the app work — to hold your games offline, remember your settings, and
+          (when signed in) keep your session token. This is essential to the
+          Service.</li>
+        <li>We do <strong>not</strong> use third-party advertising or
+          cross-site tracking cookies.</li>
+        <li>Our website host and any privacy-friendly analytics we enable may
+          set a minimal first-party cookie or use cookieless measurement for
+          aggregate traffic stats. If we add analytics, this policy will name
+          the provider.</li>
+      </ul>
+
+      <h2 id="changes">14. Changes to this policy</h2>
+      <p>
+        We may update this policy. We will post the new version here with a new
+        date and, for material changes, notify you by email or an in-app notice
+        before it takes effect.
+      </p>
+
+      <h2 id="contact">15. Contact</h2>
+      <p>
+        Questions about this policy or your data:
+        <span class="placeholder">[CONTACT EMAIL]</span><br />
+        Data rights and grievances:
+        <span class="placeholder">[GRIEVANCE / DPO EMAIL]</span><br />
+        Post: <span class="placeholder">[REGISTERED ADDRESS]</span>
+      </p>
+
+      <footer>
+        <p>♠ Poker Night · <a href="terms.html">Terms of Service</a> ·
+          <a href="refunds.html">Refunds &amp; Cancellation</a> ·
+          <a href="contact.html">Contact</a></p>
+      </footer>
+    </div>
+  </body>
+</html>
