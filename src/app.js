@@ -33,6 +33,7 @@ import { uuid } from './id.js';
 import * as store from './store.js';
 import * as report from './report.js';
 import { runMigrations, purgeOldTombstones } from './migrate.js';
+import { initInstall } from './install.js';
 import {
   TOURN_VIEWS,
   tournamentTick,
@@ -860,6 +861,7 @@ setNav({ go, toast, state, render });
 report.setToast(toast);
 report.install();
 store.install();
+initInstall();
 runMigrations();
 purgeOldTombstones();
 setSoundEnabled(loadSoundOn());

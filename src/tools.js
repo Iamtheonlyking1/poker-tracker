@@ -27,6 +27,7 @@ import { exportBlob, importAll, summarize, markExported } from './backup.js';
 import { qrSvg } from './qr.js';
 import { resultsImageBlob, resultsImageFile } from './share-image.js';
 import { setSoundEnabled, chip as soundChip } from './sound.js';
+import { installBanner, installGuideNodes } from './install.js';
 
 // ---------- controller hook (set once by app.js to avoid a circular import) ----------
 
@@ -232,9 +233,11 @@ const TILES = [
 export function viewHome() {
   const s = nav.state.session;
   const hist = loadHistory();
+  const banner = installBanner(() => openSheet('Add to Home Screen', installGuideNodes()));
   return [
     h('h1', { html: fx.icon('spade') + 'Poker Night' }),
     h('p', { class: 'muted' }, 'Run the game. Sharpen the game.'),
+    banner,
     h('div', { class: 'card cta' },
       s
         ? h('div', {},

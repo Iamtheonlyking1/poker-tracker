@@ -14,8 +14,8 @@ import { report } from './report.js';
 // Device-local keys: never synced, never in a backup file. A backup that
 // restored another device's sync cursor would be a genuine bug, so the rule is
 // structural, not a checklist.
-const DEVICE_KEY_PREFIXES = ['poker.sync.', 'sb-'];
-const DEVICE_KEYS = new Set(['poker.deviceId', 'poker.lastExport']);
+const DEVICE_KEY_PREFIXES = ['poker.sync.', 'poker.install.', 'poker.migration.', 'sb-'];
+const DEVICE_KEYS = new Set(['poker.deviceId', 'poker.lastExport', 'poker.schemaVersion']);
 
 export function isDeviceKey(key) {
   return DEVICE_KEYS.has(key) || DEVICE_KEY_PREFIXES.some((p) => key.startsWith(p));
