@@ -1,9 +1,15 @@
-// Session model + localStorage persistence + undo stack. No DOM.
+// Session model + persistence + undo stack. No DOM.
+// All storage goes through src/store.js (in-memory mirror + write-through +
+// change events). This module keeps the same synchronous API it always had.
+
+import { uuid } from './id.js';
+import { getRaw, setRaw } from './store.js';
 
 const ACTIVE_KEY = 'poker.active';
 const HISTORY_KEY = 'poker.history';
 const CURRENCY_KEY = 'poker.currency';
 const ROSTER_KEY = 'poker.roster';
+const PREFS_KEY = 'poker.prefs';
 const UNDO_LIMIT = 20;
 
 // Every persisted key, for backup/export. Keep this in sync when adding stores.
@@ -17,6 +23,8 @@ export const STORE_KEYS = [
   'poker.structures',
   'poker.customRanges',
   'poker.sound',
+  'poker.prefs',
+  'poker.schemaVersion',
 ];
 
 const STRUCTURES_KEY = 'poker.structures';
@@ -24,28 +32,37 @@ const CUSTOMRANGES_KEY = 'poker.customRanges';
 
 let undoStack = [];
 
-function uid() {
-  return Math.random().toString(36).slice(2, 9);
+// currency + sound live in one `poker.prefs` doc (so Phase 2 syncs them as a
+// single record); the bare `poker.currency` / `poker.sound` keys are kept
+// written too for one release, so an old backup still imports and a rollback
+// doesn't lose the setting.
+function loadPrefs() {
+  const raw = getRaw(PREFS_KEY);
+  try {
+    return raw ? JSON.parse(raw) : {};
+  } catch (e) {
+    return {};
+  }
+}
+function patchPrefs(patch) {
+  setRaw(PREFS_KEY, JSON.stringify({ ...loadPrefs(), ...patch, updatedAt: Date.now() }));
 }
 
 // last currency the user picked, so the next game defaults to it
 export function loadCurrencyPref() {
-  try {
-    return localStorage.getItem(CURRENCY_KEY) || 'INR';
-  } catch (e) {
-    return 'INR';
-  }
+  const p = loadPrefs();
+  if (typeof p.currency === 'string' && p.currency) return p.currency;
+  return getRaw(CURRENCY_KEY) || 'INR';
 }
 
 export function saveCurrencyPref(code) {
-  try {
-    localStorage.setItem(CURRENCY_KEY, code);
-  } catch (e) {}
+  setRaw(CURRENCY_KEY, code);
+  patchPrefs({ currency: code });
 }
 
 export function newSession({ name, defaultBuyIn, currency }) {
   return {
-    id: uid(),
+    id: uuid(),
     name: name || 'Poker night',
     startedAt: Date.now(),
     defaultBuyIn: Math.max(1, Math.round(defaultBuyIn || 500)),
@@ -57,7 +74,7 @@ export function newSession({ name, defaultBuyIn, currency }) {
 
 export function newTournament({ name, currency, buyIn, startStack, structure, payouts, rebuy, addon }) {
   return {
-    id: uid(),
+    id: uuid(),
     name: name || 'Tournament',
     startedAt: Date.now(),
     currency: currency || loadCurrencyPref(),
@@ -77,47 +94,43 @@ export function newTournament({ name, currency, buyIn, startStack, structure, pa
 // ---- saved blind structures ----
 
 export function loadStructures() {
-  return readJSON(STRUCTURES_KEY, []);
+  return readJSON(STRUCTURES_KEY, []).filter(notDeleted);
 }
 
 export function saveStructure(name, levels) {
-  const list = loadStructures().filter((x) => x.name !== name);
-  list.push({ id: uid(), name, levels });
+  const list = readJSON(STRUCTURES_KEY, []).filter((x) => x.name !== name);
+  list.push({ id: uuid(), name, levels, updatedAt: Date.now(), deletedAt: null });
   writeJSON(STRUCTURES_KEY, list);
-  return list;
+  return list.filter(notDeleted);
 }
 
 export function deleteStructure(id) {
-  const list = loadStructures().filter((x) => x.id !== id);
-  writeJSON(STRUCTURES_KEY, list);
-  return list;
+  return tombstone(STRUCTURES_KEY, id);
 }
 
 // ---- saved custom ranges (list of hand keys) ----
 
 export function loadCustomRanges() {
-  return readJSON(CUSTOMRANGES_KEY, []);
+  return readJSON(CUSTOMRANGES_KEY, []).filter(notDeleted);
 }
 
 export function saveCustomRange(name, hands) {
-  const list = loadCustomRanges().filter((x) => x.name !== name);
-  list.push({ id: uid(), name, hands: [...hands] });
+  const list = readJSON(CUSTOMRANGES_KEY, []).filter((x) => x.name !== name);
+  list.push({ id: uuid(), name, hands: [...hands], updatedAt: Date.now(), deletedAt: null });
   list.sort((a, b) => a.name.localeCompare(b.name));
   writeJSON(CUSTOMRANGES_KEY, list);
-  return list;
+  return list.filter(notDeleted);
 }
 
 export function deleteCustomRange(id) {
-  const list = loadCustomRanges().filter((x) => x.id !== id);
-  writeJSON(CUSTOMRANGES_KEY, list);
-  return list;
+  return tombstone(CUSTOMRANGES_KEY, id);
 }
 
 export function addTournamentPlayer(session, name) {
   const clean = (name || '').trim();
   if (!clean) return;
   session.players.push({
-    id: uid(),
+    id: uuid(),
     name: clean,
     entries: [{ type: 'buyin', amount: session.buyIn, chips: session.startStack, ts: Date.now() }],
     finish: null,
@@ -125,7 +138,7 @@ export function addTournamentPlayer(session, name) {
 }
 
 export function addPlayer(session, name) {
-  session.players.push({ id: uid(), name: name.trim(), buyIns: [], cashOut: null });
+  session.players.push({ id: uuid(), name: name.trim(), buyIns: [], cashOut: null });
 }
 
 export function removePlayer(session, playerId) {
@@ -163,16 +176,13 @@ export function setCashOut(session, playerId, amount) {
 // ---- persistence ----
 
 export function save(session) {
-  try {
-    localStorage.setItem(ACTIVE_KEY, JSON.stringify(session));
-  } catch (e) {
-    /* private mode / quota - nothing we can do */
-  }
+  if (session) session.updatedAt = Date.now();
+  setRaw(ACTIVE_KEY, JSON.stringify(session));
 }
 
 export function loadActive() {
+  const raw = getRaw(ACTIVE_KEY);
   try {
-    const raw = localStorage.getItem(ACTIVE_KEY);
     return raw ? JSON.parse(raw) : null;
   } catch (e) {
     return null;
@@ -180,52 +190,50 @@ export function loadActive() {
 }
 
 export function clearActive() {
-  try {
-    localStorage.removeItem(ACTIVE_KEY);
-  } catch (e) {}
+  setRaw(ACTIVE_KEY, null, { immediate: true });
   undoStack = [];
 }
 
-export function loadHistory() {
+// full list including tombstones — for mutations that must not resurrect a
+// deleted game or add a duplicate
+function allHistory() {
+  const raw = getRaw(HISTORY_KEY);
   try {
-    const raw = localStorage.getItem(HISTORY_KEY);
     return raw ? JSON.parse(raw) : [];
   } catch (e) {
     return [];
   }
 }
 
+export function loadHistory() {
+  return allHistory().filter(notDeleted);
+}
+
 export function saveToHistory(session) {
-  const hist = loadHistory();
+  const hist = allHistory();
   session.status = 'settled';
   session.settledAt = Date.now();
+  session.updatedAt = Date.now();
   if (!hist.some((s) => s.id === session.id)) {
     hist.unshift(session);
-    try {
-      localStorage.setItem(HISTORY_KEY, JSON.stringify(hist));
-    } catch (e) {}
+    setRaw(HISTORY_KEY, JSON.stringify(hist));
   }
-  return hist;
+  return hist.filter(notDeleted);
 }
 
 export function deleteFromHistory(id) {
-  const hist = loadHistory().filter((s) => s.id !== id);
-  try {
-    localStorage.setItem(HISTORY_KEY, JSON.stringify(hist));
-  } catch (e) {}
-  return hist;
+  return tombstone(HISTORY_KEY, id);
 }
 
 /** Overwrite a saved game (e.g. after ticking off a payment later). */
 export function updateHistorySession(session) {
-  const hist = loadHistory();
+  const hist = allHistory();
   const i = hist.findIndex((s) => s.id === session.id);
-  if (i < 0) return hist;
+  if (i < 0) return hist.filter(notDeleted);
+  session.updatedAt = Date.now();
   hist[i] = session;
-  try {
-    localStorage.setItem(HISTORY_KEY, JSON.stringify(hist));
-  } catch (e) {}
-  return hist;
+  setRaw(HISTORY_KEY, JSON.stringify(hist));
+  return hist.filter(notDeleted);
 }
 
 // ---- cash-game session ledger (the "My Sessions" tool) ----
@@ -234,44 +242,60 @@ const SESSIONLOG_KEY = 'poker.sessionlog';
 const QUIZ_KEY = 'poker.quiz';
 
 function readJSON(key, fallback) {
+  const raw = getRaw(key);
   try {
-    const raw = localStorage.getItem(key);
     return raw ? JSON.parse(raw) : fallback;
   } catch (e) {
     return fallback;
   }
 }
 function writeJSON(key, val) {
-  try {
-    localStorage.setItem(key, JSON.stringify(val));
-  } catch (e) {}
+  setRaw(key, JSON.stringify(val));
+}
+
+// ---- soft deletes ----
+// Deleting a record marks it rather than dropping it, so a device that pulls
+// after a delete elsewhere doesn't resurrect it. Loaders filter tombstones;
+// migrate.js purges ones older than 90 days on boot.
+const notDeleted = (r) => !(r && r.deletedAt);
+
+function tombstone(key, id) {
+  const list = readJSON(key, []);
+  const now = Date.now();
+  let hit = false;
+  for (const r of list) {
+    if (r && r.id === id && !r.deletedAt) {
+      r.deletedAt = now;
+      r.updatedAt = now;
+      hit = true;
+    }
+  }
+  if (hit) writeJSON(key, list);
+  return list.filter(notDeleted);
 }
 
 // one-time migration from the standalone toolkit.html keys
 function migrate(oldKey, newKey) {
-  try {
-    if (localStorage.getItem(newKey) == null && localStorage.getItem(oldKey) != null) {
-      localStorage.setItem(newKey, localStorage.getItem(oldKey));
-    }
-  } catch (e) {}
+  if (getRaw(newKey) == null && getRaw(oldKey) != null) {
+    setRaw(newKey, getRaw(oldKey));
+  }
 }
 
 export function loadSessionLog() {
   migrate('ptk_sessions', SESSIONLOG_KEY);
-  return readJSON(SESSIONLOG_KEY, []);
+  return readJSON(SESSIONLOG_KEY, []).filter(notDeleted);
 }
 
 export function addSessionLog(entry) {
-  const list = loadSessionLog();
-  list.push({ ...entry, id: Date.now() });
+  const list = readJSON(SESSIONLOG_KEY, []);
+  const now = Date.now();
+  list.push({ ...entry, id: uuid(), updatedAt: now, deletedAt: null });
   writeJSON(SESSIONLOG_KEY, list);
-  return list;
+  return list.filter(notDeleted);
 }
 
 export function deleteSessionLog(id) {
-  const list = loadSessionLog().filter((s) => s.id !== id);
-  writeJSON(SESSIONLOG_KEY, list);
-  return list;
+  return tombstone(SESSIONLOG_KEY, id);
 }
 
 export function loadQuizScore() {
@@ -280,37 +304,37 @@ export function loadQuizScore() {
 }
 
 export function saveQuizScore(score) {
-  writeJSON(QUIZ_KEY, score);
+  writeJSON(QUIZ_KEY, { ...score, updatedAt: Date.now() });
 }
 
 // ---- player roster (saved regulars + private notes) ----
 
 export function loadRoster() {
-  return readJSON(ROSTER_KEY, []);
+  return readJSON(ROSTER_KEY, []).filter(notDeleted);
 }
 
 export function upsertRosterPlayer({ id, name, note }) {
-  const list = loadRoster();
+  const list = readJSON(ROSTER_KEY, []);
   const clean = (name || '').trim();
-  if (!clean) return list;
+  if (!clean) return list.filter(notDeleted);
   const existing = id
     ? list.find((r) => r.id === id)
     : list.find((r) => r.name.toLowerCase() === clean.toLowerCase());
   if (existing) {
     existing.name = clean;
     if (note !== undefined) existing.note = note;
+    existing.deletedAt = null; // re-adding a name resurrects its note
+    existing.updatedAt = Date.now();
   } else {
-    list.push({ id: uid(), name: clean, note: note || '' });
+    list.push({ id: uuid(), name: clean, note: note || '', updatedAt: Date.now(), deletedAt: null });
   }
   list.sort((a, b) => a.name.localeCompare(b.name));
   writeJSON(ROSTER_KEY, list);
-  return list;
+  return list.filter(notDeleted);
 }
 
 export function deleteRosterPlayer(id) {
-  const list = loadRoster().filter((r) => r.id !== id);
-  writeJSON(ROSTER_KEY, list);
-  return list;
+  return tombstone(ROSTER_KEY, id);
 }
 
 /** note for a player name, or '' — used to surface notes during a game. */
@@ -325,34 +349,24 @@ export function noteFor(name) {
 const SOUND_KEY = 'poker.sound';
 
 export function loadSoundOn() {
-  try {
-    return localStorage.getItem(SOUND_KEY) === '1';
-  } catch (e) {
-    return false;
-  }
+  const p = loadPrefs();
+  if (typeof p.sound === 'boolean') return p.sound;
+  return getRaw(SOUND_KEY) === '1';
 }
 
 export function saveSoundOn(on) {
-  try {
-    localStorage.setItem(SOUND_KEY, on ? '1' : '0');
-  } catch (e) {}
+  setRaw(SOUND_KEY, on ? '1' : '0');
+  patchPrefs({ sound: !!on });
 }
 
 // ---- raw store access (for backup / import) ----
 
 export function rawGet(key) {
-  try {
-    return localStorage.getItem(key);
-  } catch (e) {
-    return null;
-  }
+  return getRaw(key);
 }
 
 export function rawSet(key, value) {
-  try {
-    if (value == null) localStorage.removeItem(key);
-    else localStorage.setItem(key, value);
-  } catch (e) {}
+  setRaw(key, value, { immediate: true });
 }
 
 // ---- undo ----

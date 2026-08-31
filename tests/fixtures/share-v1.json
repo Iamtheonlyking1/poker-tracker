@@ -1,0 +1,22 @@
+{
+  "note": "A real #s= payload produced by src/share.js BEFORE the Phase 1 id/migration work. This must decode forever. Player/kitty ids are re-minted on unpack, so assertions key on names, not ids.",
+  "capturedAt": "2026-08-31",
+  "payload": "eyJuIjoiRnJpZGF5IEdhbWUiLCJiIjo1MDAsInQiOjE3MjMyMDAwMDAwMDAsImMiOiJJTlIiLCJwIjpbeyJuIjoiUmFodWwiLCJpIjpbNTAwLDUwMF0sIm8iOjE0MDB9LHsibiI6IlByaXlhIiwiaSI6WzUwMF0sIm8iOjB9LHsibiI6IlNhbSIsImkiOls1MDBdLCJvIjoxMDB9XSwiayI6eyJsIjoiUGl6emEiLCJieSI6MCwiZSI6W1swLDMwMF0sWzEsMzAwXSxbMiwyMDBdXX19",
+  "expect": {
+    "name": "Friday Game",
+    "defaultBuyIn": 500,
+    "startedAt": 1723200000000,
+    "currency": "INR",
+    "status": "settled",
+    "players": [
+      { "name": "Rahul", "buyInAmounts": [500, 500], "cashOut": 1400 },
+      { "name": "Priya", "buyInAmounts": [500], "cashOut": 0 },
+      { "name": "Sam", "buyInAmounts": [500], "cashOut": 100 }
+    ],
+    "kitty": {
+      "label": "Pizza",
+      "paidByName": "Rahul",
+      "entriesByName": { "Rahul": 300, "Priya": 300, "Sam": 200 }
+    }
+  }
+}

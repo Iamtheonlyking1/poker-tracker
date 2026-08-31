@@ -11,6 +11,8 @@
 //     clock: { levelIdx, levelStartedAt, pausedElapsed, pausedAt },
 //     status: 'live' | 'settled' }
 
+import { uuid } from './id.js';
+
 // ---------- presets ----------
 
 const BLINDS = [
@@ -186,7 +188,7 @@ export function reenter(s, playerId) {
 }
 
 export function addLatePlayer(s, name) {
-  const id = Math.random().toString(36).slice(2, 9);
+  const id = uuid();
   s.players.push({ id, name: name.trim(), entries: [{ type: 'buyin', amount: s.buyIn, chips: s.startStack, ts: Date.now() }], finish: null });
   return id;
 }

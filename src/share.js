@@ -3,6 +3,7 @@
 
 import { net, settle, reconciliation, totalIn, kittyExtras } from './settle.js';
 import { fmtMoney, setCurrency } from './money.js';
+import { uuid } from './id.js';
 
 // Compact serialization: short keys, drop buy-in timestamps.
 // Kitty player refs are stored as array indices so they survive the id reshuffle.
@@ -34,7 +35,7 @@ function pack(session) {
 
 function unpack(o) {
   const players = (o.p || []).map((p) => ({
-    id: Math.random().toString(36).slice(2, 9),
+    id: uuid(),
     name: p.n,
     buyIns: (p.i || []).map((amount) => ({ amount, ts: 0 })),
     cashOut: p.o ?? null,

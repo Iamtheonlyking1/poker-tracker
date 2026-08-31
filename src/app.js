@@ -29,6 +29,10 @@ import { h, escapeHtml, fmtNet, netCount, avatar, fmtDuration } from './ui.js';
 import * as fx from './fx.js';
 import { setNav, TOOL_VIEWS, openCurrencyPicker, showQR, showResultsImage } from './tools.js';
 import { setSoundEnabled, chip as soundChip, cash as soundCash, fanfare as soundFanfare } from './sound.js';
+import { uuid } from './id.js';
+import * as store from './store.js';
+import * as report from './report.js';
+import { runMigrations, purgeOldTombstones } from './migrate.js';
 import {
   TOURN_VIEWS,
   tournamentTick,
@@ -670,7 +674,7 @@ function viewShared() {
       h('button', { html: fx.icon('copy') + 'Copy summary', onclick: () => copy(summaryText(s, { withLink: false })) }),
       h('button', { class: 'primary', html: fx.icon('check') + 'Open as my session', onclick: () => {
         const imp = JSON.parse(JSON.stringify(s));
-        imp.id = Math.random().toString(36).slice(2, 9);
+        imp.id = uuid();
         imp.status = 'live';
         state.session = imp;
         state.shared = null;
@@ -853,5 +857,11 @@ function boot() {
 }
 
 setNav({ go, toast, state, render });
+report.setToast(toast);
+report.install();
+store.install();
+runMigrations();
+purgeOldTombstones();
 setSoundEnabled(loadSoundOn());
+report.checkStoragePressure();
 boot();
