@@ -148,6 +148,12 @@ export const auth = {
     return storeTokenResponse(data);
   },
 
+  /** Anonymous session — a real auth.uid() with no email. For joining a shared game. */
+  async signInAnonymously() {
+    const data = await req('/auth/v1/signup', { method: 'POST', auth: false, body: {} });
+    return storeTokenResponse(data);
+  },
+
   /** Redirect to an OAuth provider ('google' | 'apple'). Returns via the hash. */
   signInWithOAuth(provider) {
     const redirect = encodeURIComponent(location.origin + location.pathname);
@@ -213,6 +219,32 @@ export const db = {
   async selectAll(table) {
     await auth.ensureFresh();
     return req(`/rest/v1/${table}?select=*`);
+  },
+
+  /** GET /rest/v1/<table>?<query> — caller builds the PostgREST query string. */
+  async select(table, query) {
+    await auth.ensureFresh();
+    return req(`/rest/v1/${table}?${query}`);
+  },
+
+  /** INSERT rows, returning the stored representations. */
+  async insert(table, rows) {
+    await auth.ensureFresh();
+    return req(`/rest/v1/${table}`, {
+      method: 'POST',
+      headers: { Prefer: 'return=representation' },
+      body: rows,
+    });
+  },
+
+  /** PATCH rows matching <query> with <patch>. */
+  async update(table, query, patch) {
+    await auth.ensureFresh();
+    return req(`/rest/v1/${table}?${query}`, {
+      method: 'PATCH',
+      headers: { Prefer: 'return=representation' },
+      body: patch,
+    });
   },
 
   /** Upsert rows on the primary key. Returns the stored representations. */

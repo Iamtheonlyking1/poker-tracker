@@ -35,6 +35,13 @@ import * as report from './report.js';
 import { runMigrations, purgeOldTombstones } from './migrate.js';
 import { initInstall } from './install.js';
 import { syncConfigured } from './config.js';
+
+// live-table controller, loaded on demand (needs a Supabase project)
+let live = null;
+async function liveMod() {
+  if (!live) live = await import('./live-controller.js');
+  return live;
+}
 import {
   TOURN_VIEWS,
   tournamentTick,
@@ -83,6 +90,58 @@ function mutate(fn) {
   fn(state.session);
   save(state.session);
   render();
+}
+
+// ---- game actions: a shared game appends to its event log; a local game mutates ----
+
+function liveCtl() {
+  return state.liveGame && state.liveGame.controls;
+}
+const liveFail = () => toast('Could not reach the shared game — retrying');
+
+function actBuyIn(playerId, amount) {
+  const L = liveCtl();
+  if (L) return void L.append('add_buyin', { playerId, amount }).catch(liveFail);
+  mutate((ss) => addBuyIn(ss, playerId, amount));
+}
+function actRename(playerId, name) {
+  const L = liveCtl();
+  if (L) return void L.append('rename_player', { playerId, name }).catch(liveFail);
+  mutate((ss) => renamePlayer(ss, playerId, name));
+}
+function actRemove(playerId) {
+  const L = liveCtl();
+  if (L) return void L.append('remove_player', { playerId }).catch(liveFail);
+  mutate((ss) => removePlayer(ss, playerId));
+}
+function actCashOut(playerId, amount) {
+  const L = liveCtl();
+  if (L) return void L.append('set_cashout', { playerId, amount }).catch(liveFail);
+  setCashOut(state.session, playerId, amount);
+  save(state.session);
+}
+function actRoundForAll() {
+  const s = state.session;
+  const L = liveCtl();
+  if (L) {
+    for (const p of s.players) L.append('add_buyin', { playerId: p.id, amount: s.defaultBuyIn }).catch(liveFail);
+    return;
+  }
+  mutate((ss) => rebuyAll(ss));
+}
+function actAddLatePlayer(name) {
+  const L = liveCtl();
+  if (L) {
+    const pid = uuid();
+    L.append('add_player', { playerId: pid, name })
+      .then(() => L.append('add_buyin', { playerId: pid, amount: state.session.defaultBuyIn }))
+      .catch(liveFail);
+    return;
+  }
+  mutate((ss) => {
+    addPlayer(ss, name);
+    addBuyIn(ss, ss.players[ss.players.length - 1].id, ss.defaultBuyIn);
+  });
 }
 
 function undo() {
@@ -267,7 +326,7 @@ function viewLive() {
       const inp = h('input', { class: 'rename', type: 'text', value: p.name, 'aria-label': 'Player name', enterkeyhint: 'done', autocomplete: 'off' });
       const commit = () => {
         const v = inp.value.trim();
-        if (v && v !== p.name) mutate((ss) => renamePlayer(ss, p.id, v));
+        if (v && v !== p.name) actRename(p.id, v);
         else render();
       };
       inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); inp.blur(); } });
@@ -282,7 +341,7 @@ function viewLive() {
       const v = parseInt(custom.value, 10);
       if (!(v > 0)) return;
       const rect = e.currentTarget.getBoundingClientRect();
-      mutate((ss) => addBuyIn(ss, p.id, v));
+      actBuyIn(p.id, v);
       bump(rect, v);
     };
     custom.addEventListener('keydown', (e) => { if (e.key === 'Enter') addCustom(e); });
@@ -301,7 +360,7 @@ function viewLive() {
         h('div', { class: 'card-actions' },
           h('button', { class: 'sm ghost icon-only', 'aria-label': 'Rename ' + p.name, html: fx.icon('edit'), onclick: startRename }),
           h('button', { class: 'sm danger icon-only', 'aria-label': 'Remove ' + p.name, html: fx.icon('close'),
-            onclick: () => confirm(`Remove ${p.name}?`) && mutate((ss) => removePlayer(ss, p.id)) }),
+            onclick: () => confirm(`Remove ${p.name}?`) && actRemove(p.id) }),
         ),
       ),
       h('div', { class: 'btn-row' },
@@ -309,7 +368,7 @@ function viewLive() {
           class: 'primary', html: fx.icon('plus') + fmtMoney(s.defaultBuyIn),
           onclick: (e) => {
             const rect = e.currentTarget.getBoundingClientRect();
-            mutate((ss) => addBuyIn(ss, p.id, ss.defaultBuyIn));
+            actBuyIn(p.id, s.defaultBuyIn);
             bump(rect, s.defaultBuyIn);
           },
         }),
@@ -323,15 +382,13 @@ function viewLive() {
     type: 'text', placeholder: 'Late joiner name', enterkeyhint: 'done', autocomplete: 'off',
     onkeydown: (e) => {
       if (e.key === 'Enter' && addName.value.trim()) {
-        const nm = addName.value.trim();
-        mutate((ss) => {
-          addPlayer(ss, nm);
-          addBuyIn(ss, ss.players[ss.players.length - 1].id, ss.defaultBuyIn);
-        });
+        actAddLatePlayer(addName.value.trim());
+        addName.value = '';
       }
     },
   });
 
+  const lg = state.liveGame;
   return [
     h('div', { class: 'head-row' },
       h('h1', {}, s.name),
@@ -340,6 +397,16 @@ function viewLive() {
         elapsedPill(s),
       ),
     ),
+    lg
+      ? h('div', { class: 'live-bar' },
+          h('span', { html: fx.icon('cloud') + `Sharing · <b>${lg.code}</b>` }),
+          h('button', { class: 'sm', html: fx.icon('qr') + 'QR', onclick: () => showQR(location.origin + location.pathname + '#j=' + lg.code) }),
+          h('button', { class: 'sm ghost', html: fx.icon('copy') + 'Link', onclick: () => copy(location.origin + location.pathname + '#j=' + lg.code) }),
+        )
+      : syncConfigured()
+        ? h('button', { class: 'sm ghost wide live-start', html: fx.icon('cloud') + 'Play together — everyone tracks on their phone',
+            onclick: () => startHosting() })
+        : null,
     topbar(s),
     h('div', { class: 'subbar' },
       h('button', {
@@ -347,7 +414,7 @@ function viewLive() {
         onclick: () => {
           if (!s.players.length) return;
           if (!confirm(`Add a ${fmtMoney(s.defaultBuyIn)} buy-in for all ${s.players.length} players?`)) return;
-          mutate((ss) => rebuyAll(ss));
+          actRoundForAll();
           fx.haptic([12, 30, 12]);
           soundChip();
           fx.pop(document.getElementById('pot-amt'));
@@ -359,10 +426,28 @@ function viewLive() {
     h('h2', {}, 'Add player'),
     addName,
     h('div', { class: 'actionbar' },
-      h('button', { class: 'ghost', disabled: canUndo() ? null : 'true', html: fx.icon('undo') + 'Undo', onclick: undo }),
+      lg
+        ? h('button', { class: 'ghost', html: fx.icon('logout') + 'Leave', onclick: async () => {
+            (await liveMod()).leaveLive();
+            state.session = null;
+            go('home');
+          } })
+        : h('button', { class: 'ghost', disabled: canUndo() ? null : 'true', html: fx.icon('undo') + 'Undo', onclick: undo }),
       h('button', { class: 'primary', html: 'End game' + fx.icon('forward'), onclick: () => go('cashout') }),
     ),
   ];
+}
+
+async function startHosting() {
+  toast('Starting a shared game…');
+  try {
+    const m = await liveMod();
+    await m.hostGame(state.session);
+    toast('Shared — send the code to your table');
+  } catch (e) {
+    toast('Could not start a shared game');
+    report.report(e, { kind: 'live.host' });
+  }
 }
 
 // ---------- cash out ----------
@@ -445,7 +530,12 @@ function kittyCard(s) {
 function viewCashout() {
   const s = state.session;
   const banner = h('div', {});
-  const nextBtn = h('button', { class: 'primary', html: 'Settlement' + fx.icon('forward'), onclick: () => go('results') });
+  const nextBtn = h('button', { class: 'primary', html: 'Settlement' + fx.icon('forward'), onclick: async () => {
+    if (state.liveGame) {
+      try { await state.liveGame.controls.settle(); } catch (e) { /* still show results */ }
+    }
+    go('results');
+  } });
   let wasBalanced = reconciliation(s.players).balanced;
 
   const refresh = () => {
@@ -472,20 +562,26 @@ function viewCashout() {
     else nextBtn.setAttribute('disabled', 'true');
   };
 
+  const isLive = !!state.liveGame;
   const cards = s.players.map((p) => {
     let netSpan = fmtNet(net(p));
+    let debounce = null;
     const inp = h('input', {
       type: 'number', inputmode: 'numeric', placeholder: 'Ending stack', enterkeyhint: 'done', value: p.cashOut ?? '',
       oninput: () => {
         const v = inp.value === '' ? null : parseInt(inp.value, 10);
-        setCashOut(s, p.id, Number.isNaN(v) ? null : v);
-        save(s);
+        const amt = Number.isNaN(v) ? null : v;
+        // reflect it locally right away
+        setCashOut(s, p.id, amt);
+        if (isLive) { clearTimeout(debounce); debounce = setTimeout(() => actCashOut(p.id, amt), 700); }
+        else save(s);
         const fresh = fmtNet(net(p));
         netSpan.replaceWith(fresh);
         netSpan = fresh;
         refresh();
       },
     });
+    inp.addEventListener('blur', () => { if (isLive) { clearTimeout(debounce); actCashOut(p.id, p.cashOut); } });
     return h('div', { class: 'card' },
       h('div', { class: 'row' },
         h('div', { class: 'phead' },
@@ -641,9 +737,9 @@ function viewResults() {
       h('button', { html: fx.icon('copy') + 'Copy link', onclick: () => copy(shareUrl(s)) }),
     ),
     h('div', { class: 'btn-row' },
-      h('button', { class: 'wide', html: fx.icon('check') + 'Save to history & finish', onclick: () => {
-        saveToHistory(s);
-        clearActive();
+      h('button', { class: 'wide', html: fx.icon('check') + 'Save to history & finish', onclick: async () => {
+        if (state.liveGame) (await liveMod()).saveLiveToHistory(s);
+        else { saveToHistory(s); clearActive(); }
         fx.haptic(20);
         toast('Saved to history');
         state.session = null;
@@ -655,6 +751,54 @@ function viewResults() {
     ),
   );
   return blocks;
+}
+
+function viewJoin() {
+  const code = state.joinCode || '';
+  const nameIn = h('input', { type: 'text', placeholder: 'Your name', enterkeyhint: 'go', autocomplete: 'name' });
+  const status = h('p', { class: 'muted small' });
+  let busy = false;
+
+  const join = async () => {
+    if (busy) return;
+    busy = true;
+    status.textContent = 'Joining…';
+    render();
+    try {
+      const m = await liveMod();
+      await m.joinGame(code, nameIn.value.trim() || 'Player');
+      state.joinCode = null;
+      go('live');
+    } catch (e) {
+      busy = false;
+      status.textContent = /no live game|not found/i.test(String(e.message))
+        ? 'That code didn’t match a live game. Check it and try again.'
+        : 'Could not join — check your connection.';
+      report.report(e, { kind: 'live.join' });
+      render();
+    }
+  };
+  nameIn.addEventListener('keydown', (e) => e.key === 'Enter' && join());
+
+  return [
+    h('div', { class: 'tool-head' },
+      h('button', { class: 'sm ghost icon-only', 'aria-label': 'Home', html: fx.icon('home'), onclick: () => { state.joinCode = null; go('home'); } }),
+      h('h1', {}, 'Join the table'),
+    ),
+    h('div', { class: 'card' },
+      h('div', { class: 'pmeta' }, 'Game code'),
+      h('div', { class: 'join-code' }, code || '—'),
+      h('p', { class: 'muted small' }, 'You’ll track buy-ins on your own phone, in sync with everyone else. No account needed.'),
+    ),
+    h('label', {}, 'Your name'),
+    nameIn,
+    status,
+    h('div', { style: 'height:8px' }),
+    h('button', { class: 'primary wide', disabled: busy ? 'true' : null, html: fx.icon('cloud') + 'Join game', onclick: join }),
+    h('div', { class: 'actionbar' },
+      h('button', { class: 'ghost wide', html: fx.icon('back') + 'Not now', onclick: () => { state.joinCode = null; go('home'); } }),
+    ),
+  ];
 }
 
 function viewShared() {
@@ -783,6 +927,7 @@ function nodesFor(view) {
     case 'results': return isTourn(state.session) ? viewTournamentResults(false) : viewResults();
     case 'history': return viewHistory();
     case 'shared': return isTourn(state.shared) ? viewTournamentResults(true) : viewShared();
+    case 'join': return viewJoin();
     default: return TOOL_VIEWS.home();
   }
 }
@@ -836,6 +981,7 @@ function reactiveRender() {
 store.subscribe(({ source }) => {
   if (source === 'remote' || source === 'tab') reactiveRender();
 });
+nav.softRender = reactiveRender;
 
 function afterResults() {
   fx.celebrate();
@@ -851,6 +997,13 @@ function afterResults() {
 // ---------- boot ----------
 
 function boot() {
+  const joinMatch = location.hash.match(/[#&]j=([0-9A-Za-z]{4,8})/);
+  if (joinMatch && syncConfigured()) {
+    state.joinCode = joinMatch[1].toUpperCase();
+    history.replaceState(null, '', location.pathname + location.search);
+    go('join');
+    return;
+  }
   const shared = sessionFromUrl();
   if (shared && shared.players.length) {
     state.shared = shared;

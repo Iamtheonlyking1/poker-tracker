@@ -1781,6 +1781,51 @@ canvas.chart {
   margin-top: 4px;
 }
 
+/* ---------- live table ---------- */
+
+.live-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(180deg, var(--surface-2), var(--surface));
+  border: 1px solid var(--gold-deep);
+  border-radius: 12px;
+  padding: 8px 10px;
+  margin: 6px 0 10px;
+  font-size: 0.88rem;
+}
+.live-bar > span {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+}
+.live-bar > span b {
+  color: var(--gold);
+  letter-spacing: 0.12em;
+  font-size: 0.95rem;
+}
+.live-bar .ic {
+  width: 16px;
+  height: 16px;
+}
+.live-bar button {
+  flex: none;
+  padding: 5px 9px;
+}
+.live-start {
+  margin: 6px 0 10px;
+}
+.join-code {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 2rem;
+  letter-spacing: 0.28em;
+  color: var(--gold);
+  text-align: center;
+  padding: 8px 0 4px;
+}
+
 /* ---------- install banner ---------- */
 
 .install-banner {
