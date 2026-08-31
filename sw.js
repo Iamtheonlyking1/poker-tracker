@@ -1,6 +1,6 @@
 /* Poker Night service worker — offline app shell.
    Bump CACHE on every deploy that changes any cached file. */
-const CACHE = 'poker-v18';
+const CACHE = 'poker-v19';
 const ASSETS = [
   './',
   './index.html',
@@ -26,6 +26,8 @@ const ASSETS = [
   './src/sound.js',
   './src/share-image.js',
   './src/config.js',
+  './src/entitlements.js',
+  './src/upsell.js',
   './src/supabase.js',
   './src/auth.js',
   './src/sync-boot.js',

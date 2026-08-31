@@ -27,7 +27,9 @@ const SYNCED = [
 const byKey = Object.fromEntries(SYNCED.map((s) => [s.key, s]));
 const listKinds = SYNCED.filter((s) => s.list).map((s) => s.kind);
 
-export function createEngine({ backend, store, deviceId, now = () => Date.now(), pollMs = 0 }) {
+const NO_CAP = { isPro: () => true, limit: () => Infinity };
+
+export function createEngine({ backend, store, deviceId, now = () => Date.now(), pollMs = 0, entitlement = NO_CAP }) {
   const queue = createQueue(store);
   let status = 'off';
   let statusCb = null;
@@ -84,9 +86,23 @@ export function createEngine({ backend, store, deviceId, now = () => Date.now(),
 
   // ---- diff a store against the shadow, enqueue what changed ----
   function scan(entry, sh) {
-    const recs = localRecords(entry);
+    let recs = localRecords(entry);
     const known = sh[entry.kind] || {};
-    // for the shared session kind, only touch the docs this store owns
+
+    // free plan: only the newest N settled games sync (tombstones always do, so
+    // deletes still propagate). Older games stay on the device.
+    if (entry.settled && !entitlement.isPro()) {
+      const cap = entitlement.limit('synced_sessions');
+      if (Number.isFinite(cap)) {
+        const live = recs.filter((r) => r.deletedAt || r.status === 'live');
+        const settled = recs
+          .filter((r) => !r.deletedAt && r.status !== 'live')
+          .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
+          .slice(0, cap);
+        recs = [...live, ...settled];
+      }
+    }
+
     for (const r of recs) {
       if (entry.settled && r.status === 'live') continue;
       if (entry.active && r.status && r.status !== 'live') continue;
@@ -317,6 +333,7 @@ export function createEngine({ backend, store, deviceId, now = () => Date.now(),
     async resume() {
       if (!running) return;
       await pullAndMerge().catch((e) => report(e, { kind: 'sync.resume' }));
+      scanAll(); // a plan change or new local data may have added syncable docs
       await flush();
     },
     flush,

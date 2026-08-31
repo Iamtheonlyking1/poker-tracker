@@ -1462,15 +1462,15 @@ function oauthRow(sb) {
 
 export function viewAccount() {
   const root = h('div', { class: 'account-body' }, h('p', { class: 'muted' }, 'Loading…'));
-  Promise.all([import('./supabase.js'), import('./auth.js'), import('./sync-boot.js')])
+  Promise.all([import('./supabase.js'), import('./auth.js'), import('./sync-boot.js'), import('./entitlements.js'), import('./upsell.js')])
     .then((mods) => paintAccount(root, ...mods))
     .catch(() => root.replaceChildren(h('p', { class: 'muted' }, 'Sign-in isn’t available right now.')));
   return [toolHead('Account'), root, backbar()];
 }
 
-function paintAccount(root, sb, au, boot) {
+function paintAccount(root, sb, au, boot, ent, up) {
   const st = nav.state.acct || (nav.state.acct = { step: 'email', email: '', busy: false, err: '' });
-  const redraw = () => paintAccount(root, sb, au, boot);
+  const redraw = () => paintAccount(root, sb, au, boot, ent, up);
   const fail = (e) => {
     st.err = authErr(e);
     st.busy = false;
@@ -1484,12 +1484,21 @@ function paintAccount(root, sb, au, boot) {
 
   if (sb.isSignedIn()) {
     const u = sb.currentUser() || {};
+    ent.refresh().then(redraw); // pull the latest plan, then repaint
+    const pro = ent.isPro();
     const nodes = [
       h('div', { class: 'card' },
-        h('div', { class: 'pname sm', html: fx.icon('user') + escapeAttr(u.email || 'Signed in') }),
-        h('div', { class: 'pmeta' }, 'Free plan · games sync to every device you sign in on'),
+        h('div', { class: 'row' },
+          h('div', { class: 'pname sm', html: fx.icon('user') + escapeAttr(u.email || 'Guest') }),
+          up.planBadge(),
+        ),
+        h('div', { class: 'pmeta' },
+          pro
+            ? 'Everything synced across your devices'
+            : `Your last ${ent.limit('synced_sessions')} games sync across devices`),
         h('div', { class: 'pmeta', html: fx.icon('cloud') + syncWord(boot.syncStatus()) }),
       ),
+      up.proCard(),
     ];
     if (nav.state.acctChoice) {
       nodes.push(h('div', { class: 'card' },

@@ -35,6 +35,8 @@ import * as report from './report.js';
 import { runMigrations, purgeOldTombstones } from './migrate.js';
 import { initInstall } from './install.js';
 import { syncConfigured } from './config.js';
+import { isPro as entIsPro, limit as entLimit } from './entitlements.js';
+import { isSignedIn as authedIn } from './supabase.js';
 
 // live-table controller, loaded on demand (needs a Supabase project)
 let live = null;
@@ -400,7 +402,8 @@ function viewLive() {
     ),
     lg
       ? h('div', { class: 'live-bar' },
-          h('span', { html: fx.icon('cloud') + `Sharing · <b>${lg.code}</b>` }),
+          h('span', { html: fx.icon('cloud') + `Sharing · <b>${lg.code}</b>` +
+            (lg.controls && lg.controls.members ? ` · ${lg.controls.members().length} in` : '') }),
           h('button', { class: 'sm', html: fx.icon('qr') + 'QR', onclick: () => showQR(location.origin + location.pathname + '#j=' + lg.code) }),
           h('button', { class: 'sm ghost', html: fx.icon('copy') + 'Link', onclick: () => copy(location.origin + location.pathname + '#j=' + lg.code) }),
         )
@@ -446,7 +449,11 @@ async function startHosting() {
     await m.hostGame(state.session);
     toast('Shared — send the code to your table');
   } catch (e) {
-    toast('Could not start a shared game');
+    if (/FREE_LIMIT live_games/.test(String(e && (e.detail || e.message)))) {
+      toast('Free plan: one shared game at a time. End it or go Pro.');
+    } else {
+      toast('Could not start a shared game');
+    }
     report.report(e, { kind: 'live.host' });
   }
 }
@@ -773,9 +780,12 @@ function viewJoin() {
       go('live');
     } catch (e) {
       busy = false;
-      status.textContent = /no live game|not found/i.test(String(e.message))
-        ? 'That code didn’t match a live game. Check it and try again.'
-        : 'Could not join — check your connection.';
+      const msg = String((e && (e.detail || e.message)) || '');
+      status.textContent = /FREE_LIMIT live_seats/.test(msg)
+        ? 'This table is full — 8 seats on the free plan.'
+        : /no live game|not found/i.test(msg)
+          ? 'That code didn’t match a live game. Check it and try again.'
+          : 'Could not join — check your connection.';
       report.report(e, { kind: 'live.join' });
       render();
     }
@@ -884,6 +894,14 @@ function viewHistory() {
     });
 
     out.push(h('h2', {}, 'Games'));
+    if (authedIn() && !entIsPro()) {
+      const cap = entLimit('synced_sessions');
+      const over = hist.filter((s) => s.status !== 'live').length - cap;
+      if (over > 0) {
+        out.push(h('div', { class: 'banner info cap-notice', html: fx.icon('cloud') +
+          `${over} older game${over === 1 ? '' : 's'} ${over === 1 ? 'is' : 'are'} on this device only. Pro syncs your whole history.` }));
+      }
+    }
     for (const s of hist) {
       out.push(h('div', { class: 'card' },
         h('div', { class: 'hist-item' },

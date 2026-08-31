@@ -62,13 +62,23 @@ async function req(path, { method = 'GET', body, headers = {}, auth = true, raw 
   });
   if (!res.ok) {
     let detail = '';
+    let code = '';
     try {
-      detail = (await res.json()).msg || (await res.text());
+      const txt = await res.text();
+      try {
+        const j = JSON.parse(txt);
+        detail = j.message || j.msg || j.error_description || j.error || txt;
+        code = j.code || '';
+      } catch (_) {
+        detail = txt;
+      }
     } catch (e) {
       /* ignore */
     }
     const err = new Error(`supabase ${method} ${path} → ${res.status} ${detail}`.trim());
     err.status = res.status;
+    err.pgcode = code;
+    err.detail = detail;
     throw err;
   }
   if (raw) return res;

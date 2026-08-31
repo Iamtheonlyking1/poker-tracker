@@ -9,6 +9,7 @@ import * as store from './store.js';
 import { deviceId } from './id.js';
 import { auth, onAuthChange, isSignedIn } from './supabase.js';
 import { wipeLocalData } from './auth.js';
+import { entitlementView, refresh as refreshEntitlement, onEntitlementChange } from './entitlements.js';
 import { report } from './report.js';
 
 let engine = null;
@@ -45,13 +46,20 @@ function makeEngine() {
     store,
     deviceId: deviceId(),
     pollMs: 60_000,
+    entitlement: entitlementView,
   });
   e.onStatus(hooks.onStatus);
   e.onConflict(hooks.onConflict);
   return e;
 }
 
+// a plan change re-scans (a fresh Pro user's older games start syncing)
+onEntitlementChange(() => {
+  if (engine) engine.resume().catch(noop);
+});
+
 async function onSignedIn() {
+  refreshEntitlement().catch(noop);
   if (engine) return;
   // On the very first sync, if there is data on both sides, let the user choose
   // before we merge (merge is non-destructive, but "use cloud" wipes local).

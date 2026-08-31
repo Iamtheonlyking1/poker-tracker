@@ -1781,6 +1781,40 @@ canvas.chart {
   margin-top: 4px;
 }
 
+/* ---------- plan / upsell ---------- */
+
+.plan-badge {
+  flex: none;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+.plan-badge.pro {
+  color: #0b1f16;
+  background: var(--gold);
+  border-color: var(--gold);
+}
+.pro-card {
+  border-color: var(--gold-deep);
+  box-shadow: 0 0 0 1px var(--gold-glow);
+}
+.pro-list {
+  margin: 8px 0;
+  padding-left: 20px;
+}
+.pro-list li {
+  margin: 5px 0;
+  color: var(--text);
+}
+.cap-notice {
+  font-size: 0.86rem;
+}
+
 /* ---------- live table ---------- */
 
 .live-bar {

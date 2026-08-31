@@ -155,6 +155,42 @@ test('engine — a fresh sign-in uploads existing local data', async () => {
   assert.ok(backend.snapshot().some((d) => d.doc_id === 'local1'), 'local game pushed on start');
 });
 
+test('engine — a free plan only syncs the newest N settled games (+ tombstones)', async () => {
+  const backend = createMemoryBackend();
+  const A = makeStore();
+  // 4 settled games + 1 tombstone, but the cap is 2
+  A.setRaw('poker.history', JSON.stringify([
+    { id: 'g1', name: 'oldest', updatedAt: 100, deletedAt: null, status: 'settled', players: [] },
+    { id: 'g2', name: 'mid', updatedAt: 200, deletedAt: null, status: 'settled', players: [] },
+    { id: 'g3', name: 'newer', updatedAt: 300, deletedAt: null, status: 'settled', players: [] },
+    { id: 'g4', name: 'newest', updatedAt: 400, deletedAt: null, status: 'settled', players: [] },
+    { id: 'gd', name: 'deleted', updatedAt: 50, deletedAt: 50, status: 'settled', players: [] },
+  ]));
+  const eA = createEngine({
+    backend, store: A, deviceId: 'devA', now: () => 1,
+    entitlement: { isPro: () => false, limit: () => 2 },
+  });
+  await eA.start();
+  const synced = backend.snapshot().map((d) => d.doc_id).sort();
+  assert.deepEqual(synced, ['g3', 'g4', 'gd'], 'newest 2 + the tombstone; g1/g2 stay local');
+});
+
+test('engine — pro syncs the whole history', async () => {
+  const backend = createMemoryBackend();
+  const A = makeStore();
+  A.setRaw('poker.history', JSON.stringify([
+    { id: 'g1', updatedAt: 100, deletedAt: null, status: 'settled', players: [] },
+    { id: 'g2', updatedAt: 200, deletedAt: null, status: 'settled', players: [] },
+    { id: 'g3', updatedAt: 300, deletedAt: null, status: 'settled', players: [] },
+  ]));
+  const eA = createEngine({
+    backend, store: A, deviceId: 'devA', now: () => 1,
+    entitlement: { isPro: () => true, limit: () => Infinity },
+  });
+  await eA.start();
+  assert.equal(backend.snapshot().length, 3);
+});
+
 test('engine — push failure leaves the change queued and status error', async () => {
   const backend = createMemoryBackend();
   const A = makeStore();
