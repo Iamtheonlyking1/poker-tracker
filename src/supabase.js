@@ -46,6 +46,15 @@ export function isSignedIn() {
   return !!(session && session.access_token);
 }
 
+/** The app's own URL, used as the post-auth redirect target. */
+function appUrl() {
+  try {
+    return location.origin + location.pathname;
+  } catch (e) {
+    return '';
+  }
+}
+
 function authHeaders(withToken = true) {
   const h = { apikey: getSupabaseAnonKey(), 'Content-Type': 'application/json' };
   if (withToken && session && session.access_token) {
@@ -123,10 +132,11 @@ export const auth = {
 
   /** Send a 6-digit code (and a magic link) to `email`. */
   async sendOtp(email) {
-    await req('/auth/v1/otp', {
+    const redirect = encodeURIComponent(appUrl());
+    await req(`/auth/v1/otp?redirect_to=${redirect}`, {
       method: 'POST',
       auth: false,
-      body: { email, create_user: true, should_create_user: true },
+      body: { email, create_user: true, should_create_user: true, options: { email_redirect_to: appUrl() } },
     });
   },
 
@@ -181,7 +191,7 @@ export const auth = {
 
   /** Redirect to an OAuth provider ('google' | 'apple'). Returns via the hash. */
   signInWithOAuth(provider) {
-    const redirect = encodeURIComponent(location.origin + location.pathname);
+    const redirect = encodeURIComponent(appUrl());
     location.href = `${getSupabaseUrl()}/auth/v1/authorize?provider=${provider}&redirect_to=${redirect}`;
   },
 
