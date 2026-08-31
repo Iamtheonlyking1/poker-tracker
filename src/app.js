@@ -27,13 +27,14 @@ import { summaryText, shareUrl, whatsappUrl, sessionFromUrl } from './share.js';
 import { fmtMoney, setCurrency, currencyName, currencySymbol } from './money.js';
 import { h, escapeHtml, fmtNet, netCount, avatar, fmtDuration } from './ui.js';
 import * as fx from './fx.js';
-import { setNav, TOOL_VIEWS, openCurrencyPicker, showQR, showResultsImage } from './tools.js';
+import { setNav, nav, TOOL_VIEWS, openCurrencyPicker, showQR, showResultsImage } from './tools.js';
 import { setSoundEnabled, chip as soundChip, cash as soundCash, fanfare as soundFanfare } from './sound.js';
 import { uuid } from './id.js';
 import * as store from './store.js';
 import * as report from './report.js';
 import { runMigrations, purgeOldTombstones } from './migrate.js';
 import { initInstall } from './install.js';
+import { syncConfigured } from './config.js';
 import {
   TOURN_VIEWS,
   tournamentTick,
@@ -821,6 +822,21 @@ function render(opts = {}) {
   }
 }
 
+// Re-render when data changes underneath us — a remote sync merge or another
+// tab. A full teardown would blur a field mid-keystroke, so if an input in the
+// app is focused, wait for it to blur.
+function reactiveRender() {
+  const ae = document.activeElement;
+  if (ae && ae.tagName === 'INPUT' && app.contains(ae)) {
+    ae.addEventListener('blur', () => render(), { once: true });
+    return;
+  }
+  render();
+}
+store.subscribe(({ source }) => {
+  if (source === 'remote' || source === 'tab') reactiveRender();
+});
+
 function afterResults() {
   fx.celebrate();
   fx.haptic([15, 50, 15, 50, 25]);
@@ -867,3 +883,30 @@ purgeOldTombstones();
 setSoundEnabled(loadSoundOn());
 report.checkStoragePressure();
 boot();
+
+// Accounts + cloud sync — dark until src/config.js has a Supabase URL + key.
+if (syncConfigured()) {
+  import('./sync-boot.js')
+    .then((m) => {
+      m.initSync({
+        onStatus: (s) => {
+          nav.syncStatus = s;
+          if (state.view === 'home' || state.view === 'account') reactiveRender();
+        },
+        onConflict: (c) => {
+          toast('This game is open on another device — keeping this one for now.');
+          report.report(new Error('active-session conflict'), {
+            kind: 'sync.conflict',
+            local: c.local && c.local.id,
+            remote: c.remote && c.remote.id,
+          });
+        },
+        onChoice: () => {
+          nav.state.acctChoice = true;
+          toast('You have games on this device and in your account');
+          go('account');
+        },
+      });
+    })
+    .catch((e) => report.report(e, { kind: 'sync.load' }));
+}

@@ -27,7 +27,7 @@ const SYNCED = [
 const byKey = Object.fromEntries(SYNCED.map((s) => [s.key, s]));
 const listKinds = SYNCED.filter((s) => s.list).map((s) => s.kind);
 
-export function createEngine({ backend, store, deviceId, now = () => Date.now() }) {
+export function createEngine({ backend, store, deviceId, now = () => Date.now(), pollMs = 0 }) {
   const queue = createQueue(store);
   let status = 'off';
   let statusCb = null;
@@ -36,6 +36,7 @@ export function createEngine({ backend, store, deviceId, now = () => Date.now() 
   let unsubStore = null;
   let unsubRealtime = null;
   let pushTimer = null;
+  let pollTimer = null;
   let pulling = null;
 
   const setStatus = (s) => {
@@ -180,7 +181,7 @@ export function createEngine({ backend, store, deviceId, now = () => Date.now() 
       setStatus('syncing');
       let out;
       try {
-        out = await backend.pull(Number(store.getRaw(CURSOR_KEY) || 0));
+        out = await backend.pull(store.getRaw(CURSOR_KEY) || '');
       } catch (e) {
         setStatus('offline');
         throw e;
@@ -210,7 +211,7 @@ export function createEngine({ backend, store, deviceId, now = () => Date.now() 
         if (d) applySingletonMerge(entry, d, sh);
       }
 
-      store.setRaw(CURSOR_KEY, String(out.cursor || 0));
+      if (out.cursor != null && out.cursor !== '') store.setRaw(CURSOR_KEY, String(out.cursor));
       saveShadow(sh);
       setStatus(queue.size() ? 'syncing' : 'synced');
     })();
@@ -295,10 +296,19 @@ export function createEngine({ backend, store, deviceId, now = () => Date.now() 
       }
       scanAll(); // enqueue anything local that isn't synced yet
       await flush();
+      if (pollMs > 0) {
+        pollTimer = setInterval(() => {
+          pullAndMerge()
+            .then(() => flush())
+            .catch((e) => report(e, { kind: 'sync.poll' }));
+        }, pollMs);
+      }
     },
     stop() {
       running = false;
       clearTimeout(pushTimer);
+      clearInterval(pollTimer);
+      pollTimer = null;
       if (unsubStore) unsubStore();
       if (unsubRealtime) unsubRealtime();
       unsubStore = unsubRealtime = null;

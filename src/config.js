@@ -1,11 +1,28 @@
 // Runtime config. The anon key is public by design — RLS is the security
 // boundary — so committing it is fine. Keep staging and prod on separate
-// Supabase projects. Fill these in once the project exists (see supabase/README.md).
+// Supabase projects. See supabase/README.md.
 
-export const SUPABASE_URL = '';
-export const SUPABASE_ANON_KEY = '';
+// ── Fill these in once the Supabase project exists ───────────────────────────
+const SUPABASE_URL = '';
+const SUPABASE_ANON_KEY = '';
+// ────────────────────────────────────────────────────────────────────────────
 
-/** Sync + accounts stay completely dark until this is true. */
+// Optional override without editing this file: set window.POKER_CONFIG in a
+// small inline <script> in index.html (e.g. per-environment on Cloudflare).
+const env = (typeof window !== 'undefined' && window.POKER_CONFIG) || {};
+let url = env.supabaseUrl || SUPABASE_URL;
+let anon = env.supabaseAnonKey || SUPABASE_ANON_KEY;
+
+/** Test hook / runtime override. */
+export function setConfig(u, k) {
+  url = u || '';
+  anon = k || '';
+}
+
+export const getSupabaseUrl = () => url;
+export const getSupabaseAnonKey = () => anon;
+
+/** Accounts + sync stay completely dark until this is true. */
 export function syncConfigured() {
-  return !!(SUPABASE_URL && SUPABASE_ANON_KEY);
+  return !!(url && anon);
 }

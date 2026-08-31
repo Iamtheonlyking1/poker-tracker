@@ -58,6 +58,10 @@ const P = {
   qr: '<path d="M4 4h5v5H4zM15 4h5v5h-5zM4 15h5v5H4z"/><path d="M15 15h2v2h-2zM19 15v.01M15 19v.01M19 19v2h.01M19 19h-1.5"/>',
   volume:
     '<path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16 9a3 3 0 0 1 0 6"/><path d="M18.5 7a6 6 0 0 1 0 10"/>',
+  user: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/>',
+  cloud:
+    '<path d="M7 18a4 4 0 0 1 0-8 5.5 5.5 0 0 1 10.6-1.5A3.75 3.75 0 0 1 18 18z"/>',
+  logout: '<path d="M15 12H3"/><path d="M8 7l-5 5 5 5"/><path d="M14 4h6v16h-6"/>',
 };
 
 export function icon(name, cls = '') {

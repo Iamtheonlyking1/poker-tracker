@@ -493,6 +493,9 @@ input[type="text"],
 input[type="number"],
 input[type="search"],
 input[type="date"],
+input[type="email"],
+input[type="password"],
+input[type="tel"],
 select {
   font: inherit;
   width: 100%;
@@ -1726,6 +1729,56 @@ canvas.chart {
   .topbar {
     padding: 8px 0 10px;
   }
+}
+
+/* ---------- account + sync ---------- */
+
+.home-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.home-head h1 {
+  margin: 0;
+}
+.sync-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.74rem;
+  padding: 4px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.sync-pill .sp-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.sp-synced {
+  color: var(--win);
+}
+.sp-syncing {
+  color: var(--gold);
+}
+.sp-offline {
+  color: var(--muted);
+}
+.sp-error {
+  color: var(--loss);
+}
+.account-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.account-body label {
+  margin-top: 4px;
 }
 
 /* ---------- install banner ---------- */

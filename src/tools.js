@@ -28,6 +28,8 @@ import { qrSvg } from './qr.js';
 import { resultsImageBlob, resultsImageFile } from './share-image.js';
 import { setSoundEnabled, chip as soundChip } from './sound.js';
 import { installBanner, installGuideNodes } from './install.js';
+import { syncConfigured } from './config.js';
+import { syncPill } from './sync-ui.js';
 
 // ---------- controller hook (set once by app.js to avoid a circular import) ----------
 
@@ -234,8 +236,14 @@ export function viewHome() {
   const s = nav.state.session;
   const hist = loadHistory();
   const banner = installBanner(() => openSheet('Add to Home Screen', installGuideNodes()));
+  const tiles = syncConfigured()
+    ? [['account', 'user', 'Account', 'Sign in · sync your games'], ...TILES]
+    : TILES;
   return [
-    h('h1', { html: fx.icon('spade') + 'Poker Night' }),
+    h('div', { class: 'home-head' },
+      h('h1', { html: fx.icon('spade') + 'Poker Night' }),
+      syncConfigured() ? syncPill(nav.syncStatus) : null,
+    ),
     h('p', { class: 'muted' }, 'Run the game. Sharpen the game.'),
     banner,
     h('div', { class: 'card cta' },
@@ -255,7 +263,7 @@ export function viewHome() {
     ),
     h('h2', {}, 'Tools'),
     h('div', { class: 'tool-grid' },
-      ...TILES.map(([v, ic, name, desc]) =>
+      ...tiles.map(([v, ic, name, desc]) =>
         h('button', { class: 'tool-tile', onclick: () => nav.go(v) },
           h('span', { class: 'tt-ic', html: fx.icon(ic) }),
           h('span', { class: 'tt-name' }, name),
@@ -1429,10 +1437,194 @@ export function viewData() {
   ];
 }
 
+// ---------- Account (sign in + sync) ----------
+
+const inStandalone = () =>
+  typeof window !== 'undefined' &&
+  ((window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
+    window.navigator.standalone === true);
+
+function authErr(e) {
+  const m = String((e && e.message) || e);
+  if (/429|rate/i.test(m)) return 'Too many attempts — wait a minute and try again.';
+  if (/invalid|expired|token/i.test(m)) return 'That code or password wasn’t right.';
+  if (/Failed to fetch|NetworkError/i.test(m)) return 'Can’t reach the server — check your connection.';
+  return 'Something went wrong. Try again.';
+}
+
+function oauthRow(sb) {
+  if (inStandalone()) return null; // OAuth redirects escape an installed PWA
+  return h('div', { class: 'btn-row' },
+    h('button', { class: 'ghost', html: 'Continue with Google', onclick: () => sb.auth.signInWithOAuth('google') }),
+    h('button', { class: 'ghost', html: 'Continue with Apple', onclick: () => sb.auth.signInWithOAuth('apple') }),
+  );
+}
+
+export function viewAccount() {
+  const root = h('div', { class: 'account-body' }, h('p', { class: 'muted' }, 'Loading…'));
+  Promise.all([import('./supabase.js'), import('./auth.js'), import('./sync-boot.js')])
+    .then((mods) => paintAccount(root, ...mods))
+    .catch(() => root.replaceChildren(h('p', { class: 'muted' }, 'Sign-in isn’t available right now.')));
+  return [toolHead('Account'), root, backbar()];
+}
+
+function paintAccount(root, sb, au, boot) {
+  const st = nav.state.acct || (nav.state.acct = { step: 'email', email: '', busy: false, err: '' });
+  const redraw = () => paintAccount(root, sb, au, boot);
+  const fail = (e) => {
+    st.err = authErr(e);
+    st.busy = false;
+    redraw();
+  };
+  const busy = (v) => {
+    st.busy = v;
+    st.err = '';
+    redraw();
+  };
+
+  if (sb.isSignedIn()) {
+    const u = sb.currentUser() || {};
+    const nodes = [
+      h('div', { class: 'card' },
+        h('div', { class: 'pname sm', html: fx.icon('user') + escapeAttr(u.email || 'Signed in') }),
+        h('div', { class: 'pmeta' }, 'Free plan · games sync to every device you sign in on'),
+        h('div', { class: 'pmeta', html: fx.icon('cloud') + syncWord(boot.syncStatus()) }),
+      ),
+    ];
+    if (nav.state.acctChoice) {
+      nodes.push(h('div', { class: 'card' },
+        h('h2', {}, 'This device already has games'),
+        h('p', { class: 'muted small' }, 'Keep both sets, or replace this device with what’s in your account.'),
+        h('div', { class: 'btn-row' },
+          h('button', { class: 'primary', html: 'Merge both', onclick: async () => {
+            await boot.resolveFirstSync('merge');
+            nav.state.acctChoice = false;
+            nav.toast('Merged');
+            redraw();
+          } }),
+          h('button', { class: 'ghost', html: 'Use account only', onclick: async () => {
+            if (!confirm('Replace this device’s games with your account? Games that exist only on this device will be removed.')) return;
+            await boot.resolveFirstSync('cloud');
+            nav.state.acctChoice = false;
+            nav.render();
+          } }),
+        ),
+      ));
+    }
+    nodes.push(
+      h('div', { class: 'card' },
+        h('h2', {}, 'Backup'),
+        h('p', { class: 'muted small' }, 'Your data is also in this browser. A downloaded copy is still the safest thing to keep.'),
+        h('button', { class: 'ghost wide', html: fx.icon('download') + 'Backup & restore', onclick: () => nav.go('data') }),
+      ),
+      h('button', { class: 'danger wide', html: fx.icon('logout') + 'Sign out & clear this device',
+        onclick: async () => {
+          const res = await au.signOutAndWipe({
+            flushFn: () => (boot.getEngine() ? boot.getEngine().flush() : Promise.resolve()),
+            confirmUnsynced: (n) => confirm(`${n} change${n === 1 ? '' : 's'} haven’t synced yet. Sign out and lose ${n === 1 ? 'it' : 'them'}?`),
+          });
+          if (res.ok) {
+            nav.state.acct = null;
+            nav.toast('Signed out');
+            nav.go('home');
+          }
+        } }),
+    );
+    root.replaceChildren(...nodes);
+    return;
+  }
+
+  // ---- signed out ----
+  const emailIn = h('input', { type: 'email', inputmode: 'email', autocomplete: 'email', placeholder: 'you@example.com', value: st.email, enterkeyhint: 'go' });
+  const codeIn = h('input', { type: 'text', inputmode: 'numeric', autocomplete: 'one-time-code', maxlength: '6', placeholder: '6-digit code', enterkeyhint: 'go' });
+  const pwIn = h('input', { type: 'password', autocomplete: 'current-password', placeholder: 'Password', enterkeyhint: 'go' });
+
+  const nodes = [
+    h('p', { class: 'muted' }, 'Sign in to sync your games across devices. It’s free.'),
+    st.err ? h('div', { class: 'banner warn' }, st.err) : null,
+  ];
+
+  if (st.step === 'email') {
+    const send = async () => {
+      const email = emailIn.value.trim();
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return fail(new Error('invalid email'));
+      st.email = email;
+      busy(true);
+      try {
+        await sb.auth.sendOtp(email);
+        st.step = 'code';
+        st.busy = false;
+        redraw();
+      } catch (e) {
+        fail(e);
+      }
+    };
+    emailIn.addEventListener('keydown', (e) => e.key === 'Enter' && send());
+    nodes.push(
+      h('label', {}, 'Email'),
+      emailIn,
+      h('button', { class: 'primary wide', disabled: st.busy ? 'true' : null, html: st.busy ? 'Sending…' : 'Email me a code', onclick: send }),
+      h('button', { class: 'ghost wide', html: 'Use a password instead', onclick: () => { st.step = 'password'; st.err = ''; redraw(); } }),
+      oauthRow(sb),
+    );
+  } else if (st.step === 'code') {
+    const verify = async () => {
+      busy(true);
+      try {
+        await sb.auth.verifyOtp(st.email, codeIn.value.trim());
+        nav.state.acct = null;
+        nav.toast('Signed in');
+        nav.go('home');
+      } catch (e) {
+        fail(e);
+      }
+    };
+    codeIn.addEventListener('keydown', (e) => e.key === 'Enter' && verify());
+    nodes.push(
+      h('p', { class: 'muted small' }, `Code sent to ${escapeAttr(st.email)}.`),
+      codeIn,
+      h('button', { class: 'primary wide', disabled: st.busy ? 'true' : null, html: st.busy ? 'Checking…' : 'Verify', onclick: verify }),
+      h('button', { class: 'ghost wide', html: 'Back', onclick: () => { st.step = 'email'; st.err = ''; redraw(); } }),
+    );
+  } else {
+    const go = async (creating) => {
+      const email = emailIn.value.trim();
+      const pw = pwIn.value;
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) || pw.length < 8) return fail(new Error('invalid'));
+      busy(true);
+      try {
+        await (creating ? sb.auth.signUpWithPassword(email, pw) : sb.auth.signInWithPassword(email, pw));
+        nav.state.acct = null;
+        nav.toast('Signed in');
+        nav.go('home');
+      } catch (e) {
+        fail(e);
+      }
+    };
+    nodes.push(
+      h('label', {}, 'Email'), emailIn,
+      h('label', {}, 'Password'), pwIn,
+      h('div', { class: 'btn-row' },
+        h('button', { class: 'primary', disabled: st.busy ? 'true' : null, html: 'Sign in', onclick: () => go(false) }),
+        h('button', { class: 'ghost', disabled: st.busy ? 'true' : null, html: 'Create account', onclick: () => go(true) }),
+      ),
+      h('button', { class: 'ghost wide', html: 'Email me a code instead', onclick: () => { st.step = 'email'; st.err = ''; redraw(); } }),
+      oauthRow(sb),
+    );
+  }
+  root.replaceChildren(...nodes.filter(Boolean));
+}
+
+function syncWord(s) {
+  return { syncing: 'Syncing…', synced: 'All synced', offline: 'Offline — will catch up', error: 'Sync issue — retrying' }[s] || 'Connecting…';
+}
+const escapeAttr = (s) => String(s).replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
+
 // ---------- registry ----------
 
 export const TOOL_VIEWS = {
   home: viewHome,
+  account: viewAccount,
   roster: viewRoster,
   data: viewData,
   playerstats: () => viewPlayerStats(nav.state.statsPlayer),
