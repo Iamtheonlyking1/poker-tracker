@@ -56,15 +56,16 @@ export function keys(prefix) {
   return prefix ? all.filter((k) => k.startsWith(prefix)) : all;
 }
 
-// `immediate` is accepted for call-site intent/readability but writes are always
-// synchronous now; it's a no-op kept so the Phase 2 sync layer can reintroduce
-// deferred writes without touching every call site.
-export function setRaw(key, value, _opts) {
+// Writes are always synchronous (see the module header). `opts.source` lets the
+// sync engine tag its own merge write-backs as 'remote' so its store listener
+// ignores them instead of re-enqueuing them. `opts.immediate` is accepted and
+// ignored — kept so call sites don't churn if deferred writes ever return.
+export function setRaw(key, value, opts = {}) {
   ensureHydrated();
   if (value == null) mem.delete(key);
   else mem.set(key, String(value));
   writeKey(key);
-  emit(key, 'local');
+  emit(key, opts.source || 'local');
 }
 
 function writeKey(k) {

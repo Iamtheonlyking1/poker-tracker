@@ -1,0 +1,35 @@
+# Minimal local-dev config. `supabase start` reads this; production settings
+# live in the Supabase dashboard.
+project_id = "poker-night"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+major_version = 15
+
+[studio]
+enabled = true
+port = 54323
+
+[auth]
+enabled = true
+site_url = "http://localhost:8000"
+additional_redirect_urls = ["http://localhost:8000"]
+jwt_expiry = 3600
+enable_signup = true
+
+[auth.email]
+enable_signup = true
+enable_confirmations = false   # we use 6-digit OTP, not confirmation links
+
+# OAuth providers are configured in the dashboard for staging/prod:
+#   [auth.external.google]  / [auth.external.apple]
+
+[auth.sms]
+enable_signup = false
