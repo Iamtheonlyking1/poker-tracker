@@ -312,6 +312,7 @@ function topbar(session) {
 
 function viewLive() {
   const s = state.session;
+  if (!s) return [h('div', { class: 'tool-head' }, h('h1', {}, 'Loading…')), h('p', { class: 'muted' }, 'Connecting to the game…')];
 
   const bump = (rect, amount) => {
     fx.floatUp(rect, '+' + fmtMoney(amount));
@@ -529,6 +530,7 @@ function kittyCard(s) {
 
 function viewCashout() {
   const s = state.session;
+  if (!s) return [h('div', { class: 'tool-head' }, h('h1', {}, 'Loading…'))];
   const banner = h('div', {});
   const nextBtn = h('button', { class: 'primary', html: 'Settlement' + fx.icon('forward'), onclick: async () => {
     if (state.liveGame) {

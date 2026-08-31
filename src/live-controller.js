@@ -16,13 +16,17 @@ export function liveActive() {
 
 function attach(gameId, code) {
   active = { gameId, code, controls: null };
+  let first;
+  const ready = new Promise((res) => (first = res));
   active.controls = openLiveSession(gameId, (folded) => {
     nav.state.session = folded;
     nav.state.liveGame = active;
+    first();
     // a joiner who was on the live screen when the host settles → results
     if (folded.status === 'settled' && nav.state.view === 'live') nav.go('results');
     else (nav.softRender || nav.render)();
   });
+  active.ready = ready;
   return active;
 }
 
@@ -56,6 +60,7 @@ export async function joinGame(code, displayName) {
   const game = await joinLiveGame(code, displayName);
   attach(game.id, game.join_code);
   active.ownerId = game.owner_id;
+  await Promise.race([active.ready, new Promise((r) => setTimeout(r, 4000))]);
   return game;
 }
 
