@@ -1578,9 +1578,11 @@ function paintAccount(root, sb, au, boot, ent, up) {
     );
   } else if (st.step === 'code') {
     const verify = async () => {
+      const c = codeIn.value.trim();
+      if (!c) return;
       busy(true);
       try {
-        await sb.auth.verifyOtp(st.email, codeIn.value.trim());
+        await sb.auth.verifyOtp(st.email, c);
         nav.state.acct = null;
         nav.toast('Signed in');
         nav.go('home');
@@ -1590,10 +1592,17 @@ function paintAccount(root, sb, au, boot, ent, up) {
     };
     codeIn.addEventListener('keydown', (e) => e.key === 'Enter' && verify());
     nodes.push(
-      h('p', { class: 'muted small' }, `Code sent to ${escapeAttr(st.email)}.`),
-      codeIn,
-      h('button', { class: 'primary wide', disabled: st.busy ? 'true' : null, html: st.busy ? 'Checking…' : 'Verify', onclick: verify }),
-      h('button', { class: 'ghost wide', html: 'Back', onclick: () => { st.step = 'email'; st.err = ''; redraw(); } }),
+      h('div', { class: 'card' },
+        h('div', { class: 'pname sm', html: fx.icon('check') + 'Check your email' }),
+        h('p', { class: 'muted small' }, `Sent to ${escapeAttr(st.email)}. Open it on this device and tap the sign-in link — you’ll come straight back here, signed in.`),
+      ),
+      h('details', { class: 'code-fallback' },
+        h('summary', {}, 'Got a code instead of a link?'),
+        codeIn,
+        h('button', { class: 'primary wide', disabled: st.busy ? 'true' : null, html: st.busy ? 'Checking…' : 'Verify code', onclick: verify }),
+      ),
+      h('button', { class: 'ghost wide', html: 'Use a different email', onclick: () => { st.step = 'email'; st.err = ''; redraw(); } }),
+      h('button', { class: 'ghost wide', html: 'Use a password instead', onclick: () => { st.step = 'password'; st.err = ''; redraw(); } }),
     );
   } else {
     const go = async (creating) => {

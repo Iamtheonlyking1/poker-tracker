@@ -1814,6 +1814,22 @@ canvas.chart {
 .cap-notice {
   font-size: 0.86rem;
 }
+.code-fallback {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+.code-fallback summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.code-fallback[open] summary {
+  margin-bottom: 8px;
+}
+.code-fallback input {
+  margin-bottom: 8px;
+}
 
 /* ---------- live table ---------- */
 

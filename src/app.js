@@ -1079,6 +1079,11 @@ if (syncConfigured()) {
           toast('You have games on this device and in your account');
           go('account');
         },
+        onSignedIn: (viaLink) => {
+          toast('Signed in');
+          if (viaLink || state.view === 'account') go('home');
+          else reactiveRender();
+        },
       });
     })
     .catch((e) => report.report(e, { kind: 'sync.load' }));

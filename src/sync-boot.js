@@ -13,7 +13,8 @@ import { entitlementView, refresh as refreshEntitlement, onEntitlementChange } f
 import { report } from './report.js';
 
 let engine = null;
-let hooks = { onStatus: () => {}, onConflict: () => {}, onChoice: () => {} };
+let hooks = { onStatus: () => {}, onConflict: () => {}, onChoice: () => {}, onSignedIn: () => {} };
+let wasSignedIn = false;
 
 const CURSOR_KEY = 'poker.sync.cursor';
 const firstEver = () => !store.getRaw(CURSOR_KEY);
@@ -23,16 +24,22 @@ export function initSync(h = {}) {
     onStatus: h.onStatus || (() => {}),
     onConflict: h.onConflict || (() => {}),
     onChoice: h.onChoice || (() => {}),
+    onSignedIn: h.onSignedIn || (() => {}),
   };
 
+  const hadHashTokens = /access_token=/.test(location.hash);
   auth.init(); // picks up an OAuth/magic-link return in the URL hash
 
   onAuthChange((session) => {
-    if (session && session.access_token) onSignedIn();
+    const now = !!(session && session.access_token);
+    if (now && !wasSignedIn) hooks.onSignedIn(hadHashTokens);
+    wasSignedIn = now;
+    if (now) onSignedIn();
     else stopEngine();
   });
 
-  if (isSignedIn()) onSignedIn();
+  wasSignedIn = isSignedIn();
+  if (wasSignedIn) onSignedIn();
 
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible' && engine) engine.resume().catch(noop);
