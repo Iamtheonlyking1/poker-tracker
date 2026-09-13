@@ -1445,11 +1445,14 @@ const inStandalone = () =>
     window.navigator.standalone === true);
 
 function authErr(e) {
-  const m = String((e && e.message) || e);
+  const m = String((e && (e.detail || e.message)) || e);
+  if (/already registered|already exists|user_already_exists/i.test(m)) return 'That email already has an account — tap Sign in instead.';
+  if (/should be at least|password.*short|weak_password/i.test(m)) return 'Password needs to be at least 6 characters.';
+  if (/invalid login|invalid_credentials|invalid grant/i.test(m)) return 'Wrong email or password.';
   if (/429|rate/i.test(m)) return 'Too many attempts — wait a minute and try again.';
   if (/invalid|expired|token/i.test(m)) return 'That code or password wasn’t right.';
   if (/Failed to fetch|NetworkError/i.test(m)) return 'Can’t reach the server — check your connection.';
-  return 'Something went wrong. Try again.';
+  return `Something went wrong: ${m.slice(0, 120)}`;
 }
 
 function oauthRow(sb) {
