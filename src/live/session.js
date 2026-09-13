@@ -9,7 +9,11 @@ import { createRealtime } from './realtime.js';
 import { shortCode } from '../id.js';
 import { report } from '../report.js';
 
-const POLL_MS = 3000;
+// Realtime (postgres_changes push) is the primary transport — a refetch fires
+// the instant anyone appends an event, no polling needed for that. POLL_MS is
+// only a rare safety net for a socket that died silently; own actions,
+// visibility-regain, and reconnects trigger an immediate refetch below.
+const POLL_MS = 25000;
 const HEARTBEAT_MS = 30000;
 
 /** Host a new shared game. Returns { gameId, code }. */
@@ -151,6 +155,13 @@ export function openLiveSession(gameId, onSession) {
   const unsubGame = rt.subscribeInserts('live_games', `id=eq.${gameId}`, () => refetch());
   rt.connect();
 
+  const onVisible = () => {
+    if (document.visibilityState === 'visible') refetch();
+  };
+  const onOnline = () => refetch();
+  document.addEventListener('visibilitychange', onVisible);
+  window.addEventListener('online', onOnline);
+
   pollTimer = setInterval(refetch, POLL_MS);
   hbTimer = setInterval(heartbeat, HEARTBEAT_MS);
   refetch();
@@ -169,6 +180,8 @@ export function openLiveSession(gameId, onSession) {
       stopped = true;
       clearInterval(pollTimer);
       clearInterval(hbTimer);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('online', onOnline);
       unsubEvents();
       unsubGame();
       rt.close();
