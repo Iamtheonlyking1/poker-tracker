@@ -297,3 +297,12 @@ export const db = {
     return req(`/rest/v1/rpc/${fn}`, { method: 'POST', body: args || {} });
   },
 };
+
+// ---------------------------------------------------------------- edge functions
+export const functions = {
+  /** POST /functions/v1/<name> with the caller's fresh access token attached. */
+  async invoke(name, body) {
+    await auth.ensureFresh();
+    return req(`/functions/v1/${name}`, { method: 'POST', body: body || {} });
+  },
+};

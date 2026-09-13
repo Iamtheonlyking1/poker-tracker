@@ -1466,7 +1466,13 @@ function oauthRow(sb) {
 export function viewAccount() {
   const root = h('div', { class: 'account-body' }, h('p', { class: 'muted' }, 'Loading…'));
   Promise.all([import('./supabase.js'), import('./auth.js'), import('./sync-boot.js'), import('./entitlements.js'), import('./upsell.js')])
-    .then((mods) => paintAccount(root, ...mods))
+    .then(([sb, au, boot, ent, up]) => {
+      paintAccount(root, sb, au, boot, ent, up);
+      // one refresh per visit to this screen — NOT inside paintAccount, which
+      // redraw() calls on every interaction; chaining refresh().then(redraw)
+      // there would restart itself forever, including after navigating away.
+      if (sb.isSignedIn()) ent.refresh().then(() => paintAccount(root, sb, au, boot, ent, up));
+    })
     .catch(() => root.replaceChildren(h('p', { class: 'muted' }, 'Sign-in isn’t available right now.')));
   return [toolHead('Account'), root, backbar()];
 }
@@ -1487,8 +1493,58 @@ function paintAccount(root, sb, au, boot, ent, up) {
 
   if (sb.isSignedIn()) {
     const u = sb.currentUser() || {};
-    ent.refresh().then(redraw); // pull the latest plan, then repaint
     const pro = ent.isPro();
+    const bill = nav.state.billing || (nav.state.billing = { busy: false, err: '' });
+
+    const onUpgrade = async () => {
+      bill.busy = true;
+      bill.err = '';
+      redraw();
+      try {
+        const { startCheckout } = await import('./billing.js');
+        const res = await startCheckout();
+        bill.busy = false;
+        if (res.completed) {
+          nav.toast('Payment received — confirming…');
+          // the webhook usually lands within a couple of seconds; poll a few times
+          for (const delay of [1500, 3000, 5000, 8000]) {
+            await new Promise((r) => setTimeout(r, delay));
+            await ent.refresh();
+            if (ent.isPro()) break;
+          }
+          if (!ent.isPro()) bill.err = 'Payment went through — plan should update within a minute. Reopen this screen if it doesn’t.';
+        }
+        redraw();
+      } catch (e) {
+        bill.busy = false;
+        bill.err = (e && e.message) || 'Checkout failed.';
+        redraw();
+      }
+    };
+
+    const onManage = async () => {
+      if (!confirm('Cancel Pro? You keep access until the end of the current billing period.')) return;
+      bill.busy = true;
+      bill.err = '';
+      redraw();
+      try {
+        const { cancelSubscription } = await import('./billing.js');
+        const res = await cancelSubscription();
+        bill.busy = false;
+        nav.toast(res.endsAt
+          ? `Cancelled — Pro stays active until ${new Date(res.endsAt).toLocaleDateString('en-IN', { dateStyle: 'medium' })}`
+          : 'Cancelled');
+        redraw();
+      } catch (e) {
+        bill.busy = false;
+        bill.err = (e && e.message) || 'Could not cancel.';
+        redraw();
+      }
+    };
+
+    const entRow = ent.current();
+    const canManage = pro && entRow.provider === 'razorpay' && entRow.provider_subscription_id;
+
     const nodes = [
       h('div', { class: 'card' },
         h('div', { class: 'row' },
@@ -1501,7 +1557,12 @@ function paintAccount(root, sb, au, boot, ent, up) {
             : `Your last ${ent.limit('synced_sessions')} games sync across devices`),
         h('div', { class: 'pmeta', html: fx.icon('cloud') + syncWord(boot.syncStatus()) }),
       ),
-      up.proCard(),
+      up.proCard({
+        busy: bill.busy,
+        err: bill.err,
+        onUpgrade: pro ? null : onUpgrade,
+        onManage: canManage ? onManage : null,
+      }),
     ];
     if (nav.state.acctChoice) {
       nodes.push(h('div', { class: 'card' },

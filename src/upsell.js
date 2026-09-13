@@ -1,9 +1,10 @@
-// Small plan-status + upgrade-prompt bits. Pro isn't purchasable yet (Phase 5
-// wires Razorpay) — for now the card explains what it is and points at support.
+// Small plan-status + upgrade-prompt bits. The actual checkout call
+// (src/billing.js) and its loading/error state live with the caller
+// (tools.js's Account view) — this module stays presentational.
 
 import { h } from './ui.js';
 import * as fx from './fx.js';
-import { isPro } from './entitlements.js';
+import { isPro, current } from './entitlements.js';
 
 export const PRO_PRICE = '₹349/mo';
 
@@ -11,13 +12,30 @@ export function planBadge() {
   return h('span', { class: 'plan-badge' + (isPro() ? ' pro' : '') }, isPro() ? 'Pro' : 'Free');
 }
 
-export function proCard() {
+/**
+ * `state`: { busy, err, onUpgrade, onManage }. onUpgrade/onManage are called
+ * with no args; this module doesn't know how billing.js works, just renders
+ * whatever state the caller hands it.
+ */
+export function proCard(state = {}) {
+  const { busy, err, onUpgrade, onManage } = state;
+  const ent = current();
+
   if (isPro()) {
-    return h('div', { class: 'card' },
+    const endsAt = ent.current_period_end ? new Date(ent.current_period_end) : null;
+    return h('div', { class: 'card pro-card' },
       h('div', { class: 'pname sm', html: fx.icon('cloud') + 'Pro' }),
       h('div', { class: 'pmeta' }, 'Whole history synced · unlimited shared games · everything unlocked'),
+      endsAt
+        ? h('div', { class: 'pmeta' }, `Renews ${endsAt.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}`)
+        : null,
+      err ? h('div', { class: 'banner warn' }, err) : null,
+      onManage
+        ? h('button', { class: 'ghost wide', disabled: busy ? 'true' : null, html: busy ? 'Working…' : 'Cancel subscription', onclick: onManage })
+        : null,
     );
   }
+
   return h('div', { class: 'card pro-card' },
     h('h2', {}, 'Poker Night Pro'),
     h('ul', { class: 'pro-list' },
@@ -25,8 +43,11 @@ export function proCard() {
       h('li', {}, 'Unlimited shared games, no 8-seat cap'),
       h('li', {}, 'Hand logging, leagues, full stats & AI review as they land'),
     ),
-    h('p', { class: 'muted small' },
-      `Planned at ${PRO_PRICE}. Not on sale yet — reply to your sign-in email to get on the early list.`),
+    h('p', { class: 'muted small' }, `${PRO_PRICE} · cancel anytime`),
+    err ? h('div', { class: 'banner warn' }, err) : null,
+    onUpgrade
+      ? h('button', { class: 'primary wide', disabled: busy ? 'true' : null, html: busy ? 'Opening checkout…' : `Upgrade to Pro — ${PRO_PRICE}`, onclick: onUpgrade })
+      : null,
   );
 }
 

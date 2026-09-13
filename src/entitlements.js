@@ -58,7 +58,10 @@ export async function refresh() {
     return current();
   }
   try {
-    const rows = await db.select('entitlements', 'select=plan,status,limits');
+    const rows = await db.select(
+      'entitlements',
+      'select=plan,status,limits,provider,provider_subscription_id,current_period_end',
+    );
     ent = (Array.isArray(rows) ? rows[0] : rows) || null;
   } catch (e) {
     report(e, { kind: 'entitlements.refresh' });
