@@ -1468,10 +1468,13 @@ export function viewAccount() {
   Promise.all([import('./supabase.js'), import('./auth.js'), import('./sync-boot.js'), import('./entitlements.js'), import('./upsell.js')])
     .then(([sb, au, boot, ent, up]) => {
       paintAccount(root, sb, au, boot, ent, up);
-      // one refresh per visit to this screen — NOT inside paintAccount, which
+      // one refresh per real visit to this screen — gated on nav.freshNav so
+      // a reactive re-render (remote sync merge, sync-status flip) while
+      // already sitting on Account doesn't refresh again and potentially
+      // restart a chain of its own. NOT inside paintAccount either, which
       // redraw() calls on every interaction; chaining refresh().then(redraw)
-      // there would restart itself forever, including after navigating away.
-      if (sb.isSignedIn()) ent.refresh().then(() => paintAccount(root, sb, au, boot, ent, up));
+      // there would restart itself forever regardless of navigation.
+      if (sb.isSignedIn() && nav.freshNav) ent.refresh().then(() => paintAccount(root, sb, au, boot, ent, up));
     })
     .catch(() => root.replaceChildren(h('p', { class: 'muted' }, 'Sign-in isn’t available right now.')));
   return [toolHead('Account'), root, backbar()];

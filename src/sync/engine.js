@@ -270,7 +270,13 @@ export function createEngine({ backend, store, deviceId, now = () => Date.now(),
       remote,
       { localDeviceId: deviceId },
     );
-    store.setRaw('poker.active', JSON.stringify(winner), { source: 'remote' });
+    // only write (and thus only fire the store's remote-change listeners) when
+    // the winner actually differs — otherwise every pull that sees the same
+    // unchanged active session re-writes it, re-triggering a reactive
+    // re-render for no reason every single pull cycle.
+    if (JSON.stringify(winner) !== JSON.stringify(localActive)) {
+      store.setRaw('poker.active', JSON.stringify(winner), { source: 'remote' });
+    }
     shadowSet(sh, 'session', String(remote.id), winner.updatedAt || 0);
   }
 

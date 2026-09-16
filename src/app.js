@@ -956,8 +956,13 @@ let lastView = null;
 
 function render(opts = {}) {
   const view = state.view;
-  const nav = opts.nav || lastView !== view;
+  const isFreshNav = opts.nav || lastView !== view;
   const firstPaint = lastView === null;
+  // exposed so a view (e.g. tools.js's viewAccount) can tell "the user just
+  // navigated here" apart from "something reactively re-rendered while I'm
+  // already sitting here" — needed to do once-per-visit work without it
+  // restarting on every remote-sync-driven re-render.
+  nav.freshNav = isFreshNav;
 
   clearInterval(state._tick);
   state._tick = null;
@@ -966,10 +971,10 @@ function render(opts = {}) {
     app.replaceChildren(...nodesFor(view).flat().filter(Boolean));
     lastView = view;
     fx.attachRipples(app);
-    if (nav) fx.staggerIn(app);
+    if (isFreshNav) fx.staggerIn(app);
   };
 
-  if (nav && !firstPaint) fx.withTransition(paint);
+  if (isFreshNav && !firstPaint) fx.withTransition(paint);
   else paint();
 
   if (view === 'live' && state.session && state.session.type === 'tournament') {
@@ -981,7 +986,7 @@ function render(opts = {}) {
     }, 30000);
   }
 
-  if (nav) {
+  if (isFreshNav) {
     window.scrollTo({ top: 0 });
     if (view === 'results' || view === 'shared') requestAnimationFrame(afterResults);
   }
