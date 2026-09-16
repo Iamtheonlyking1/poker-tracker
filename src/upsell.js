@@ -6,7 +6,9 @@ import { h } from './ui.js';
 import * as fx from './fx.js';
 import { isPro, current } from './entitlements.js';
 
-export const PRO_PRICE = '₹349/mo';
+export const PRO_PRICE = '₹300/mo';
+export const PRO_PRICE_ORIGINAL = '₹499/mo';
+export const PRO_DISCOUNT_LABEL = '40% off launch price';
 
 export function planBadge() {
   return h('span', { class: 'plan-badge' + (isPro() ? ' pro' : '') }, isPro() ? 'Pro' : 'Free');
@@ -43,7 +45,7 @@ export function proCard(state = {}) {
       h('li', {}, 'Unlimited shared games, no 8-seat cap'),
       h('li', {}, 'Hand logging, leagues, full stats & AI review as they land'),
     ),
-    h('p', { class: 'muted small' }, `${PRO_PRICE} · cancel anytime`),
+    h('p', { class: 'muted small', html: `<s>${PRO_PRICE_ORIGINAL}</s> ${PRO_PRICE} · ${PRO_DISCOUNT_LABEL} · cancel anytime` }),
     err ? h('div', { class: 'banner warn' }, err) : null,
     onUpgrade
       ? h('button', { class: 'primary wide', disabled: busy ? 'true' : null, html: busy ? 'Opening checkout…' : `Upgrade to Pro — ${PRO_PRICE}`, onclick: onUpgrade })
