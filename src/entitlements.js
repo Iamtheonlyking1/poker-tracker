@@ -51,10 +51,28 @@ export function effectiveLimit(key) {
   return isPro() ? Infinity : limit(key);
 }
 
+function sameEnt(a, b) {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return (
+    a.plan === b.plan &&
+    a.status === b.status &&
+    a.provider === b.provider &&
+    a.provider_subscription_id === b.provider_subscription_id &&
+    a.current_period_end === b.current_period_end &&
+    JSON.stringify(a.limits || {}) === JSON.stringify(b.limits || {})
+  );
+}
+
+// Only notify subscribers when the entitlement actually changed. Without
+// this, refresh() → emit() → onEntitlementChange → engine.resume() →
+// sync-status flip → a reactive re-render on the Account screen → that
+// re-render calls refresh() again → forever, even though nothing changed.
 export async function refresh() {
   if (!currentUser()) {
+    const changed = ent !== null;
     ent = null;
-    emit();
+    if (changed) emit();
     return current();
   }
   try {
@@ -62,11 +80,13 @@ export async function refresh() {
       'entitlements',
       'select=plan,status,limits,provider,provider_subscription_id,current_period_end',
     );
-    ent = (Array.isArray(rows) ? rows[0] : rows) || null;
+    const next = (Array.isArray(rows) ? rows[0] : rows) || null;
+    const changed = !sameEnt(ent, next);
+    ent = next;
+    if (changed) emit();
   } catch (e) {
     report(e, { kind: 'entitlements.refresh' });
   }
-  emit();
   return current();
 }
 
