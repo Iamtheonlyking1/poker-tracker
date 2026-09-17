@@ -9,8 +9,8 @@ import { nav } from './tools.js';
 import { settle } from './settle.js';
 import {
   loadCurrencyPref, saveCurrencyPref, loadRoster, loadStructures, saveStructure,
-  deleteStructure, newTournament, addTournamentPlayer, save, saveToHistory,
-  clearActive, updateHistorySession,
+  deleteStructure, loadPayoutStructures, savePayoutStructure, newTournament,
+  addTournamentPlayer, save, saveToHistory, clearActive, updateHistorySession,
 } from './state.js';
 import * as T from './tournament.js';
 
@@ -37,6 +37,10 @@ const mmss = (ms) => {
 };
 const levelLabel = (lv) =>
   !lv ? '—' : lv.break ? 'Break' : `${lv.sb} / ${lv.bb}${lv.ante ? `  ·  ante ${lv.ante}` : ''}`;
+const ordWord = (n) => n + (['th', 'st', 'nd', 'rd'][((n % 100) - 20) % 10] || ['th', 'st', 'nd', 'rd'][n % 100] || 'th');
+const payoutSummary = (rows) =>
+  `${rows.length} place${rows.length === 1 ? '' : 's'} paid · ` +
+  rows.map((r) => (Number.isInteger(r.pct) ? r.pct : r.pct.toFixed(1))).join(' / ') + '%';
 
 // ---------- setup ----------
 
@@ -49,6 +53,7 @@ function defaultDraft() {
     structureKey: 'standard',
     structure: T.STRUCTURE_PRESETS.standard.levels.map((l) => ({ ...l })),
     payoutKey: 'top3',
+    payouts: T.PAYOUT_PRESETS.top3.rows.map((r) => ({ ...r })),
     rebuyOn: false,
     rebuy: { throughLevel: 4, amount: 0, stack: 0 },
     addonOn: false,
@@ -92,8 +97,21 @@ export function viewTournamentSetup() {
   structSel.value = d.structureKey;
   const nLevels = d.structure.filter((l) => !l.break).length;
 
-  const payoutSel = sel(Object.entries(T.PAYOUT_PRESETS).map(([k, v]) => [k, v.name]),
-    { onchange: () => { d.payoutKey = payoutSel.value; } });
+  const payoutOpts = [
+    ...(d.payoutKey === 'custom' ? [['custom', 'Custom — ' + payoutSummary(d.payouts)]] : []),
+    ...Object.entries(T.PAYOUT_PRESETS).map(([k, v]) => [k, v.name]),
+    ...loadPayoutStructures().map((p) => ['saved:' + p.id, p.name]),
+  ];
+  const payoutSel = sel(payoutOpts, { onchange: () => {
+    d.payoutKey = payoutSel.value;
+    if (payoutSel.value.startsWith('saved:')) {
+      const p = loadPayoutStructures().find((x) => 'saved:' + x.id === payoutSel.value);
+      d.payouts = p ? p.rows.map((r) => ({ ...r })) : d.payouts;
+    } else {
+      d.payouts = T.PAYOUT_PRESETS[payoutSel.value].rows.map((r) => ({ ...r }));
+    }
+    nav.render();
+  } });
   payoutSel.value = d.payoutKey;
 
   const rebuyChk = h('input', { type: 'checkbox', checked: d.rebuyOn ? 'true' : null,
@@ -157,10 +175,13 @@ export function viewTournamentSetup() {
 
   const start = h('button', { class: 'primary wide', html: 'Start tournament' + fx.icon('forward'), onclick: () => {
     if (d.pending.length < 2) return nav.toast('Add at least 2 players');
+    if (!d.payouts.length) return nav.toast('Add at least one paid place');
+    const totalPct = d.payouts.reduce((a, r) => a + (r.pct || 0), 0);
+    if (Math.abs(totalPct - 100) > 0.5) return nav.toast(`Payouts add up to ${totalPct.toFixed(1)}%, not 100% — fix in Edit`);
     const s = newTournament({
       name: d.name, currency: d.currency, buyIn: d.buyIn, startStack: d.startStack,
       structure: d.structure,
-      payouts: T.PAYOUT_PRESETS[d.payoutKey].rows,
+      payouts: d.payouts,
       rebuy: d.rebuyOn ? { ...d.rebuy } : null,
       addon: d.addonOn ? { ...d.addon } : null,
     });
@@ -195,6 +216,10 @@ export function viewTournamentSetup() {
       h('button', { class: 'sm ghost', html: fx.icon('edit') + 'Edit', onclick: () => { nav.state.tReturn = 'tournsetup'; nav.go('structedit'); } }),
     ),
     h('label', {}, 'Payouts'), payoutSel,
+    h('div', { class: 'row struct-row' },
+      h('span', { class: 'muted small' }, payoutSummary(d.payouts)),
+      h('button', { class: 'sm ghost', html: fx.icon('edit') + 'Edit', onclick: () => { nav.state.tReturn = 'tournsetup'; nav.go('payoutedit'); } }),
+    ),
     h('label', { class: 'check' }, rebuyChk, h('span', {}, 'Allow rebuys / re-entry')),
     d.rebuyOn ? periodBlock('rebuy', 'Rebuy') : null,
     h('label', { class: 'check' }, addonChk, h('span', {}, 'Allow an add-on')),
@@ -269,6 +294,84 @@ export function viewStructEdit() {
     h('div', { class: 'actionbar' },
       h('button', { class: 'primary wide', html: fx.icon('check') + 'Done', onclick: () => {
         if (draft) draft.structureKey = 'custom';
+        nav.go(back);
+      } }),
+    ),
+  ];
+}
+
+// ---------- payout editor ----------
+
+export function viewPayoutEdit() {
+  const back = nav.state.tReturn || 'home';
+  const draft = nav.state.tDraft;
+  let rows = draft ? draft.payouts : (nav.state.tPayouts || T.PAYOUT_PRESETS.top3.rows.map((r) => ({ ...r })));
+  if (!draft) nav.state.tPayouts = rows;
+
+  const listEl = h('div', {});
+  const totalEl = h('div', { class: 'pmeta center' });
+  const renumber = () => rows.forEach((r, i) => { r.place = i + 1; });
+  const renderTotal = () => {
+    const total = rows.reduce((a, r) => a + (r.pct || 0), 0);
+    const onTarget = Math.abs(total - 100) < 0.05;
+    totalEl.textContent = `Total: ${total % 1 ? total.toFixed(1) : total}%` + (onTarget ? '' : ' — should be 100%');
+    totalEl.className = 'pmeta center' + (onTarget ? ' net-win' : ' net-loss');
+  };
+  const render = () => {
+    listEl.replaceChildren(...rows.map((r, i) =>
+      h('div', { class: 'kitty-row' },
+        h('span', { class: 'kr-name' }, ordWord(r.place) + ' place'),
+        h('input', { type: 'number', inputmode: 'decimal', class: 'sm', style: 'width:90px', value: r.pct,
+          oninput: (e) => { r.pct = parseFloat(e.target.value) || 0; renderTotal(); } }),
+        h('span', { class: 'muted small' }, '%'),
+        h('button', { class: 'sm danger icon-only', 'aria-label': 'Remove', html: fx.icon('close'),
+          onclick: () => { rows.splice(i, 1); renumber(); render(); renderTotal(); } }),
+      )));
+  };
+  render();
+  renderTotal();
+
+  const addPlace = () => {
+    const last = rows[rows.length - 1];
+    rows.push({ place: rows.length + 1, pct: last ? Math.max(0, Math.round(last.pct / 2)) : 0 });
+    render();
+    renderTotal();
+  };
+  const normalize = () => {
+    const total = rows.reduce((a, r) => a + (r.pct || 0), 0);
+    if (!total) return;
+    rows.forEach((r) => { r.pct = Math.round((r.pct / total) * 1000) / 10; });
+    render();
+    renderTotal();
+  };
+  const evenSplit = () => {
+    if (!rows.length) return;
+    const each = Math.floor(1000 / rows.length) / 10;
+    rows.forEach((r, i) => { r.pct = i === 0 ? Math.round((100 - each * (rows.length - 1)) * 10) / 10 : each; });
+    render();
+    renderTotal();
+  };
+
+  return [
+    head('Payouts', back),
+    h('p', { class: 'muted small' }, 'How many places get paid, and how much of the pool each one gets — fully your call.'),
+    listEl,
+    totalEl,
+    h('div', { class: 'btn-row' },
+      h('button', { class: 'ghost', html: fx.icon('plus') + 'Place', onclick: addPlace }),
+      h('button', { class: 'ghost', html: fx.icon('scale') + 'Normalize to 100%', onclick: normalize }),
+      h('button', { class: 'ghost', html: fx.icon('grid') + 'Split evenly', onclick: evenSplit }),
+    ),
+    h('div', { class: 'btn-row' },
+      h('button', { class: 'ghost wide', html: fx.icon('download') + 'Save as preset', onclick: () => {
+        const name = prompt('Name this payout structure:');
+        if (name && name.trim()) { savePayoutStructure(name.trim(), rows.map((r) => ({ ...r }))); nav.toast('Saved'); }
+      } }),
+    ),
+    h('div', { class: 'actionbar' },
+      h('button', { class: 'primary wide', html: fx.icon('check') + 'Done', onclick: () => {
+        if (!rows.length) return nav.toast('Add at least one paid place');
+        if (draft) draft.payoutKey = 'custom';
         nav.go(back);
       } }),
     ),
@@ -562,4 +665,5 @@ function fmtDurationMs(ms) {
 export const TOURN_VIEWS = {
   tournsetup: viewTournamentSetup,
   structedit: viewStructEdit,
+  payoutedit: viewPayoutEdit,
 };

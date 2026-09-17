@@ -21,6 +21,7 @@ export const STORE_KEYS = [
   'poker.sessionlog',
   'poker.quiz',
   'poker.structures',
+  'poker.payoutStructures',
   'poker.customRanges',
   'poker.sound',
   'poker.prefs',
@@ -28,6 +29,7 @@ export const STORE_KEYS = [
 ];
 
 const STRUCTURES_KEY = 'poker.structures';
+const PAYOUTSTRUCTS_KEY = 'poker.payoutStructures';
 const CUSTOMRANGES_KEY = 'poker.customRanges';
 
 let undoStack = [];
@@ -106,6 +108,23 @@ export function saveStructure(name, levels) {
 
 export function deleteStructure(id) {
   return tombstone(STRUCTURES_KEY, id);
+}
+
+// ---- saved payout structures (list of { place, pct }) ----
+
+export function loadPayoutStructures() {
+  return readJSON(PAYOUTSTRUCTS_KEY, []).filter(notDeleted);
+}
+
+export function savePayoutStructure(name, rows) {
+  const list = readJSON(PAYOUTSTRUCTS_KEY, []).filter((x) => x.name !== name);
+  list.push({ id: uuid(), name, rows, updatedAt: Date.now(), deletedAt: null });
+  writeJSON(PAYOUTSTRUCTS_KEY, list);
+  return list.filter(notDeleted);
+}
+
+export function deletePayoutStructure(id) {
+  return tombstone(PAYOUTSTRUCTS_KEY, id);
 }
 
 // ---- saved custom ranges (list of hand keys) ----

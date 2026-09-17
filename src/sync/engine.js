@@ -20,6 +20,7 @@ const SYNCED = [
   { key: 'poker.roster', kind: 'roster', list: true },
   { key: 'poker.sessionlog', kind: 'logentry', list: true },
   { key: 'poker.structures', kind: 'structure', list: true },
+  { key: 'poker.payoutStructures', kind: 'payoutstructure', list: true },
   { key: 'poker.customRanges', kind: 'range', list: true },
   { key: 'poker.prefs', kind: 'prefs', list: false },
   { key: 'poker.quiz', kind: 'quiz', list: false },
