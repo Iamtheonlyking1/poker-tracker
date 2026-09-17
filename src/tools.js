@@ -731,15 +731,76 @@ export function viewQuiz() {
 
 // ---------- Equity ----------
 
+// A single tappable card face (empty slot or a chosen card). Tapping opens a
+// full 52-card spread to pick from — no scroll-wheel selects, just tap the
+// card you mean, like laying it down on the table.
+function eqCardFace(idx) {
+  const suitCh = idx == null ? '' : poker.cardLabel(idx).slice(-1);
+  const red = suitCh === '♥' || suitCh === '♦';
+  const cls = idx == null ? 'eq-card empty' : 'eq-card' + (red ? ' red' : ' black');
+  return { cls, html: idx == null ? '<span class="eq-card-plus">+</span>' : `<span class="eq-card-rank">${poker.cardLabel(idx).slice(0, -1)}</span><span class="eq-card-suit">${suitCh}</span>` };
+}
+
+function openCardPicker(usedSet, currentIdx, onPick) {
+  let closeSheet = () => {};
+  const grid = h('div', { class: 'eq-picker-grid' });
+  for (const suit of poker.EQ_SUITS) {
+    const row = h('div', { class: 'eq-picker-row' });
+    for (const rank of poker.EQ_RANKS) {
+      const i = poker.cardIndex(rank, suit);
+      const used = usedSet.has(i);
+      const face = eqCardFace(i);
+      row.append(h('button', {
+        type: 'button',
+        class: face.cls + ' sm' + (used ? ' used' : '') + (i === currentIdx ? ' on' : ''),
+        disabled: used ? 'true' : null,
+        html: face.html,
+        onclick: () => { closeSheet(); onPick(i); },
+      }));
+    }
+    grid.append(row);
+  }
+  const body = [grid];
+  if (currentIdx != null) {
+    body.push(h('button', { class: 'ghost wide', html: fx.icon('close') + 'Clear this card', onclick: () => { closeSheet(); onPick(null); } }));
+  }
+  const { close } = openSheet('Pick a card', body);
+  closeSheet = close;
+}
+
 export function viewEquity() {
-  const mkRank = (req) => sel([...(req ? [] : [['', '—']]), ...poker.EQ_RANKS.map((x) => [x, x])]);
-  const mkSuit = (req) => sel([...(req ? [] : [['', '—']]), ...poker.EQ_SUITS.map((x) => [x, poker.EQ_SUIT_SYM[x]])]);
-  const pick = (defR, defS, req) => {
-    const r = mkRank(req);
-    const s = mkSuit(req);
-    if (defR) r.value = defR;
-    if (defS) s.value = defS;
-    return { r, s, idx: () => poker.cardIndex(r.value, s.value), el: h('div', { class: 'card-pick' }, r, s) };
+  // every pick() slot registers itself here so a picker sheet can grey out
+  // cards already in use elsewhere on the table
+  const allSlots = [];
+  const usedIdxExcept = (self) => {
+    const set = new Set();
+    for (const p of allSlots) {
+      if (p === self || !p.active()) continue;
+      const i = p.idx();
+      if (i != null) set.add(i);
+    }
+    return set;
+  };
+  const pick = () => {
+    let cur = null;
+    let active = () => true;
+    const face = h('button', { type: 'button', class: 'eq-card empty', 'aria-label': 'Pick a card', html: '<span class="eq-card-plus">+</span>' });
+    const obj = { idx: () => cur, active: () => active(), el: face };
+    const paint = () => {
+      const f = eqCardFace(cur);
+      face.className = f.cls;
+      face.innerHTML = f.html;
+    };
+    face.addEventListener('click', () => {
+      openCardPicker(usedIdxExcept(obj), cur, (picked) => {
+        cur = picked;
+        paint();
+      });
+    });
+    obj.setActive = (fn) => { active = fn; };
+    obj.set = (r, s) => { cur = r && s ? poker.cardIndex(r, s) : null; paint(); };
+    allSlots.push(obj);
+    return obj;
   };
 
   const custom = loadCustomRanges();
@@ -759,13 +820,17 @@ export function viewEquity() {
   };
 
   // hero
-  const hH1 = pick('A', 's', false);
-  const hH2 = pick('K', 'd', false);
-  const heroHandUI = h('div', { class: 'field-grid two' }, hH1.el, hH2.el);
+  const hH1 = pick();
+  const hH2 = pick();
+  hH1.set('A', 's');
+  hH2.set('K', 'd');
+  const heroHandUI = h('div', { class: 'eq-hand-row' }, hH1.el, hH2.el);
   const heroRangeSel = sel(rangeOpts);
   heroRangeSel.value = 'strong';
   const heroRangeUI = h('div', { hidden: 'true' }, heroRangeSel);
   let heroMode = 'hand';
+  hH1.setActive(() => heroMode === 'hand');
+  hH2.setActive(() => heroMode === 'hand');
   const heroSeg = h('div', { class: 'seg' },
     h('button', { class: 'seg-btn on', onclick: () => setHero('hand') }, 'A hand'),
     h('button', { class: 'seg-btn', onclick: () => setHero('range') }, 'A range'));
@@ -777,13 +842,15 @@ export function viewEquity() {
   };
 
   // villain
-  const vH1 = pick('', '', false);
-  const vH2 = pick('', '', false);
-  const villHandUI = h('div', { class: 'field-grid two', hidden: 'true' }, vH1.el, vH2.el);
+  const vH1 = pick();
+  const vH2 = pick();
+  const villHandUI = h('div', { class: 'eq-hand-row', hidden: 'true' }, vH1.el, vH2.el);
   const villRangeSel = sel(rangeOpts);
   villRangeSel.value = 'strong';
   const villRangeUI = h('div', {}, villRangeSel);
   let villMode = 'range';
+  vH1.setActive(() => villMode === 'hand');
+  vH2.setActive(() => villMode === 'hand');
   const villSeg = h('div', { class: 'seg' },
     h('button', { class: 'seg-btn on', onclick: () => setVill('range') }, 'A range'),
     h('button', { class: 'seg-btn', onclick: () => setVill('hand') }, 'A hand'));
@@ -794,8 +861,8 @@ export function viewEquity() {
     [...villSeg.children].forEach((btn, i) => btn.classList.toggle('on', ['range', 'hand'][i] === m));
   };
 
-  // board
-  const board = Array.from({ length: 5 }, () => pick('', '', false));
+  // board — dealt like a real table: flop grouped, then turn, then river
+  const board = Array.from({ length: 5 }, () => pick());
 
   const res = h('div', {}, h('p', { class: 'muted empty' }, 'Set it up and run.'));
   const runBtn = h('button', { class: 'primary wide', html: 'Run simulation' });
@@ -875,7 +942,12 @@ export function viewEquity() {
     ),
     h('div', { class: 'card' },
       h('h2', {}, 'Board (optional)'),
-      h('div', { class: 'board-grid' }, ...board.map((p) => p.el)),
+      h('div', { class: 'eq-board' },
+        h('div', { class: 'eq-board-group' }, board[0].el, board[1].el, board[2].el),
+        h('div', { class: 'eq-board-group' }, board[3].el),
+        h('div', { class: 'eq-board-group' }, board[4].el),
+      ),
+      h('p', { class: 'muted small eq-board-hint' }, 'Flop · Turn · River — tap a card to set it, leave blank for preflop.'),
     ),
     runBtn,
     h('div', { class: 'card' }, h('h2', {}, 'Result'), res),
