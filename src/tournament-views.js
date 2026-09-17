@@ -199,6 +199,7 @@ export function viewTournamentSetup() {
     T.startClock(s);
     nav.state.session = s;
     nav.state.tDraft = null;
+    nav.state.tShowPlayers = false;
     clearActive();
     saveCurrencyPref(d.currency);
     save(s);
@@ -409,9 +410,20 @@ export function tournamentTick() {
 export function viewTournamentLive() {
   const s = nav.state.session;
   const lv = T.currentLevel(s);
-  const nx = T.nextLevel(s);
   const paused = T.isPaused(s);
   _lastLevelIdx = s.clock.levelIdx;
+
+  const upcoming = T.upcomingLevels(s, 8);
+  const upcomingStrip = upcoming.length
+    ? h('div', { class: 'tc-upcoming scroll-x' },
+        h('div', { class: 'tc-upcoming-row' },
+          ...upcoming.map((u) =>
+            h('div', { class: 'tc-up-chip' + (u.level.break ? ' brk' : '') },
+              h('div', { class: 'tc-up-lv' }, u.level.break ? 'Break' : 'Lv ' + u.number),
+              h('div', { class: 'tc-up-blinds' }, levelLabel(u.level)),
+            )),
+        ))
+    : null;
 
   const clock = h('div', { class: 'tclock-wrap' + (paused ? ' paused' : '') + (lv && lv.break ? ' brk' : '') },
     h('div', { class: 'tc-level' }, lv && lv.break ? 'BREAK' : `Level ${T.levelNumber(s)}`),
@@ -425,7 +437,7 @@ export function viewTournamentLive() {
       h('button', { class: 'sm ghost icon-only', 'aria-label': 'Next level', html: fx.icon('forward'),
         onclick: () => { T.gotoLevel(s, s.clock.levelIdx + 1); save(s); nav.render(); } }),
     ),
-    nx ? h('div', { class: 'tc-next' }, 'Next — ' + levelLabel(nx)) : null,
+    upcomingStrip,
   );
 
   const left = T.playersLeft(s);
@@ -482,6 +494,14 @@ export function viewTournamentLive() {
       }
     } });
 
+  if (nav.state.tShowPlayers == null) nav.state.tShowPlayers = false;
+  const showPlayers = nav.state.tShowPlayers;
+  const playersToggle = h('button', {
+    class: 'ghost wide',
+    html: fx.icon('users') + (showPlayers ? 'Hide players' : `Show players (${s.players.length})`),
+    onclick: () => { nav.state.tShowPlayers = !showPlayers; nav.render(); },
+  });
+
   return [
     h('div', { class: 'head-row' },
       h('h1', {}, s.name),
@@ -491,7 +511,8 @@ export function viewTournamentLive() {
     ),
     clock,
     strip,
-    h('div', { class: 'cards' }, ...cards),
+    playersToggle,
+    showPlayers ? h('div', { class: 'cards' }, ...cards) : null,
     h('h2', {}, 'Late entry'),
     lateIn,
     h('div', { class: 'actionbar' },

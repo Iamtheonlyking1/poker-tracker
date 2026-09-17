@@ -86,14 +86,28 @@ export function nextLevel(s) {
   return (s.structure || [])[(s.clock ? s.clock.levelIdx : 0) + 1] || null;
 }
 
-/** blind-level number (breaks don't count), or 0 on a break. */
-export function levelNumber(s) {
-  const idx = s.clock ? s.clock.levelIdx : 0;
+/** blind-level number at a given structure index (breaks don't count), or 0 on a break. */
+export function levelNumberAt(s, idx) {
   let n = 0;
   for (let i = 0; i <= idx; i++) {
     if (!(s.structure[i] && s.structure[i].break)) n += 1;
   }
   return s.structure[idx] && s.structure[idx].break ? 0 : n;
+}
+
+/** blind-level number of the current level (breaks don't count), or 0 on a break. */
+export function levelNumber(s) {
+  return levelNumberAt(s, s.clock ? s.clock.levelIdx : 0);
+}
+
+/** the next `count` levels after the current one — for a "what's coming up" strip. */
+export function upcomingLevels(s, count = 8) {
+  const idx = s.clock ? s.clock.levelIdx : 0;
+  const out = [];
+  for (let i = idx + 1; i < (s.structure || []).length && out.length < count; i++) {
+    out.push({ idx: i, level: s.structure[i], number: levelNumberAt(s, i) });
+  }
+  return out;
 }
 
 export function levelElapsedMs(s) {
