@@ -779,10 +779,10 @@ label {
 }
 .tc-time {
   font-family: "Fraunces", Georgia, serif;
-  font-size: 5.2rem;
+  font-size: 7.2rem;
   font-weight: 600;
   line-height: 1;
-  margin: 8px 0 14px;
+  margin: 10px 0 16px;
   font-variant-numeric: tabular-nums;
   color: var(--text);
 }
