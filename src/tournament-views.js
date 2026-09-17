@@ -8,7 +8,7 @@ import { openCurrencyPicker, showResultsImage } from './tools.js';
 import { nav } from './tools.js';
 import { settle } from './settle.js';
 import {
-  loadCurrencyPref, saveCurrencyPref, loadRoster, loadStructures, saveStructure,
+  loadCurrencyPref, saveCurrencyPref, loadRoster, upsertRosterPlayer, loadStructures, saveStructure,
   deleteStructure, loadPayoutStructures, savePayoutStructure, newTournament,
   addTournamentPlayer, save, saveToHistory, clearActive, updateHistorySession,
 } from './state.js';
@@ -41,6 +41,15 @@ const ordWord = (n) => n + (['th', 'st', 'nd', 'rd'][((n % 100) - 20) % 10] || [
 const payoutSummary = (rows) =>
   `${rows.length} place${rows.length === 1 ? '' : 's'} paid · ` +
   rows.map((r) => (Number.isInteger(r.pct) ? r.pct : r.pct.toFixed(1))).join(' / ') + '%';
+
+// a name typed while setting up or running a tournament is worth remembering
+// for next time — but don't churn the roster for a name already saved.
+function maybeSaveToRoster(name) {
+  const clean = (name || '').trim();
+  if (!clean) return;
+  if (loadRoster().some((r) => r.name.toLowerCase() === clean.toLowerCase())) return;
+  upsertRosterPlayer({ name: clean });
+}
 
 // ---------- setup ----------
 
@@ -158,6 +167,7 @@ export function viewTournamentSetup() {
     const c = nm.trim();
     if (!c || d.pending.some((x) => x.toLowerCase() === c.toLowerCase())) return;
     d.pending.push(c);
+    maybeSaveToRoster(c);
     renderList();
     renderRoster();
   };
@@ -465,6 +475,7 @@ export function viewTournamentLive() {
   const lateIn = h('input', { type: 'text', placeholder: 'Late entry name', enterkeyhint: 'done', autocomplete: 'off',
     onkeydown: (e) => {
       if (e.key === 'Enter' && lateIn.value.trim()) {
+        maybeSaveToRoster(lateIn.value.trim());
         T.addLatePlayer(s, lateIn.value.trim());
         save(s);
         nav.render();

@@ -16,6 +16,7 @@ import {
   loadCurrencyPref,
   saveCurrencyPref,
   loadRoster,
+  upsertRosterPlayer,
   noteFor,
   loadSoundOn,
   pushUndo,
@@ -131,7 +132,18 @@ function actRoundForAll() {
   }
   mutate((ss) => rebuyAll(ss));
 }
+// a name typed anywhere while setting up or running a game is worth
+// remembering for next time — but don't churn the roster (re-sort, bump
+// updatedAt) for a name that's already saved.
+function maybeSaveToRoster(name) {
+  const clean = (name || '').trim();
+  if (!clean) return;
+  if (loadRoster().some((r) => r.name.toLowerCase() === clean.toLowerCase())) return;
+  upsertRosterPlayer({ name: clean });
+}
+
 function actAddLatePlayer(name) {
+  maybeSaveToRoster(name);
   const L = liveCtl();
   if (L) {
     const pid = uuid();
@@ -230,6 +242,7 @@ function viewSetup() {
     const clean = name.trim();
     if (!clean || pending.some((p) => p.toLowerCase() === clean.toLowerCase())) return;
     pending.push(clean);
+    maybeSaveToRoster(clean);
     renderList();
     renderRoster();
   };
