@@ -1046,6 +1046,11 @@ label {
   gap: 12px;
   box-shadow: var(--shadow-pop);
   animation: sheetup 0.26s var(--ease-out);
+  /* on a wide window a full-viewport sheet stretches its contents (e.g. the
+     equity card grid) out thin and empty-looking — cap it like #app does */
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
 }
 .sheet-wrap.closing .sheet {
   animation: sheetdown 0.2s var(--ease-in) forwards;
@@ -1298,6 +1303,7 @@ label.check input {
 
 .eq-hand-row {
   display: flex;
+  justify-content: center;
   gap: 10px;
 }
 
@@ -1310,6 +1316,10 @@ label.check input {
   background: radial-gradient(120% 140% at 50% 0%, var(--felt) 0%, var(--felt-edge) 100%);
   border: 1px solid var(--border);
   border-radius: var(--radius);
+  /* keep the felt strip snug around the cards instead of stretching thin
+     across a wide #app container on desktop */
+  max-width: 320px;
+  margin: 0 auto;
 }
 .eq-board-group {
   display: flex;
