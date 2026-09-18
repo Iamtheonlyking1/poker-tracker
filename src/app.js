@@ -56,7 +56,7 @@ import { sessionNets, prizePool as tournPool } from './tournament.js';
 const app = document.getElementById('app');
 
 // view: 'home' | 'setup' | 'live' | 'cashout' | 'results' | 'history' | 'shared'
-//     | 'bbcalc' | 'ranges' | 'action' | 'odds' | 'quiz' | 'equity' | 'study' | 'sessions'
+//     | 'calchub' | 'studyhub' | 'sessions' | 'roster' | 'data' | 'account'
 let state = {
   view: 'home',
   session: null,

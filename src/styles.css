@@ -737,6 +737,11 @@ label {
   border-color: var(--gold-deep);
   color: var(--gold);
 }
+.seg-4 .seg-btn {
+  min-height: 40px;
+  font-size: 0.82rem;
+  padding: 0 4px;
+}
 
 /* ---------- tournament ---------- */
 

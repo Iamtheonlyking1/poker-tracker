@@ -220,14 +220,8 @@ function slug(s) {
 
 const TILES = [
   ['roster', 'users', 'Players', 'Saved regulars & notes'],
-  ['bbcalc', 'calc', 'BB Calc', 'Stack in big blinds'],
-  ['ranges', 'grid', 'Ranges', 'Opening charts by seat'],
-  ['action', 'target', 'Action', 'Preflop advisor'],
-  ['odds', 'percent', 'Odds & SPR', 'Pot odds, equity, SPR'],
-  ['quiz', 'dice', 'Range Quiz', 'Drill your ranges'],
-  ['equity', 'graph', 'Equity', 'Hand vs range'],
-  ['icm', 'scale', 'ICM / Chop', 'Fair split by chip stacks'],
-  ['study', 'book', 'Study', 'Sizing, blockers, theory'],
+  ['studyhub', 'book', 'Study', 'Charts, advisor, quiz, theory'],
+  ['calchub', 'calc', 'Calculators', 'BB, odds, equity, ICM'],
   ['sessions', 'ledger', 'My Sessions', 'Personal cash-game log'],
   ['data', 'database', 'Data & sound', 'Backup, restore, sound'],
 ];
@@ -1779,19 +1773,52 @@ const escapeAttr = (s) => String(s).replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>
 
 // ---------- registry ----------
 
+// ---------- hub screens: a few related tools sharing one tabbed screen ----------
+// Each sub-tool's own view fn still returns [toolHead(...), ...cards, backbar()]
+// unchanged — the hub just borrows the middle (the cards) and supplies one
+// shared head/tab-bar/backbar instead of each tool having its own.
+function hubBody(fn) {
+  const nodes = fn();
+  return nodes.slice(1, -1);
+}
+
+function hubView(title, tabs, stateKey) {
+  const tab = nav.state[stateKey] || (nav.state[stateKey] = tabs[0][0]);
+  const seg = h('div', { class: 'seg seg-4' },
+    ...tabs.map(([key, , label]) =>
+      h('button', { class: 'seg-btn' + (tab === key ? ' on' : ''),
+        onclick: () => { nav.state[stateKey] = key; nav.render(); } }, label)));
+  const active = tabs.find(([key]) => key === tab) || tabs[0];
+  return [toolHead(title), seg, ...hubBody(active[1]), backbar()];
+}
+
+const CALC_TABS = [
+  ['bbcalc', viewBBCalc, 'BB'],
+  ['odds', viewOdds, 'Odds'],
+  ['equity', viewEquity, 'Equity'],
+  ['icm', viewICM, 'ICM'],
+];
+export function viewCalculators() {
+  return hubView('Calculators', CALC_TABS, 'calcTab');
+}
+
+const STUDY_TABS = [
+  ['ranges', viewRanges, 'Charts'],
+  ['action', viewAction, 'Advisor'],
+  ['quiz', viewQuiz, 'Quiz'],
+  ['study', viewStudy, 'Theory'],
+];
+export function viewStudyHub() {
+  return hubView('Study', STUDY_TABS, 'studyTab');
+}
+
 export const TOOL_VIEWS = {
   home: viewHome,
   account: viewAccount,
   roster: viewRoster,
   data: viewData,
   playerstats: () => viewPlayerStats(nav.state.statsPlayer),
-  icm: viewICM,
-  bbcalc: viewBBCalc,
-  ranges: viewRanges,
-  action: viewAction,
-  odds: viewOdds,
-  quiz: viewQuiz,
-  equity: viewEquity,
-  study: viewStudy,
+  calchub: viewCalculators,
+  studyhub: viewStudyHub,
   sessions: viewSessions,
 };
