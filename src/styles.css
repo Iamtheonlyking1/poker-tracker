@@ -1181,6 +1181,28 @@ label {
   font-size: 1.25rem;
   margin-bottom: 2px;
 }
+.cta-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.cta-badge {
+  flex: none;
+  width: 46px;
+  height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 13px;
+  background: linear-gradient(160deg, rgba(231, 189, 92, 0.25), rgba(231, 189, 92, 0.06));
+  border: 1px solid var(--gold-glow);
+  color: var(--gold);
+}
+.cta-badge .ic {
+  width: 24px;
+  height: 24px;
+  filter: drop-shadow(0 0 8px var(--gold-glow));
+}
 .cta button {
   margin-top: 14px;
 }
@@ -1203,12 +1225,20 @@ label {
   border-radius: 14px;
 }
 .tool-tile .tt-ic {
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 11px;
+  background: linear-gradient(160deg, rgba(231, 189, 92, 0.2), rgba(231, 189, 92, 0.05));
+  border: 1px solid var(--gold-glow);
   color: var(--gold);
-  margin-bottom: 4px;
+  margin-bottom: 8px;
 }
 .tool-tile .tt-ic .ic {
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
 }
 .tool-tile .tt-name {
   font-weight: 700;

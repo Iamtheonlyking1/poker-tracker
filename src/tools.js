@@ -241,15 +241,18 @@ export function viewHome() {
     h('p', { class: 'muted' }, 'Run the game. Sharpen the game.'),
     banner,
     h('div', { class: 'card cta' },
-      s
-        ? h('div', {},
-            h('div', { class: 'pmeta' }, 'Game in progress'),
-            h('div', { class: 'pname' }, s.name),
-          )
-        : h('div', {},
-            h('div', { class: 'pname' }, "Tonight's game"),
-            h('div', { class: 'pmeta' }, 'Track buy-ins, settle up clean'),
-          ),
+      h('div', { class: 'cta-row' },
+        h('div', { class: 'cta-badge', html: fx.icon(s ? 'clock' : 'spade') }),
+        s
+          ? h('div', {},
+              h('div', { class: 'pmeta' }, 'Game in progress'),
+              h('div', { class: 'pname' }, s.name),
+            )
+          : h('div', {},
+              h('div', { class: 'pname' }, "Tonight's game"),
+              h('div', { class: 'pmeta' }, 'Track buy-ins, settle up clean'),
+            ),
+      ),
       s
         ? h('button', { class: 'primary wide', html: 'Resume game' + fx.icon('forward'),
             onclick: () => nav.go(s.players.some((p) => p.cashOut != null) ? 'cashout' : 'live') })
