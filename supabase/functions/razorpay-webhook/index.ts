@@ -66,13 +66,21 @@ function mapEventToEntitlement(event) {
 
   switch (type) {
     case 'subscription.activated':
-    case 'subscription.charged':
+    case 'subscription.charged': {
+      // which plan length / price tier this subscription was sold at — set by
+      // create-subscription in the subscription's notes, and carried on every
+      // renewal, so a launch-price customer stays identifiable as one
+      const term = ['1m', '3m', '6m', '12m'].includes(sub.notes.term) ? sub.notes.term : null;
+      const tier = ['launch', 'list'].includes(sub.notes.tier) ? sub.notes.tier : null;
       return patch({
         plan: 'pro',
         status: 'active',
         provider_customer_id: sub.customer_id || null,
         current_period_end: sub.current_end ? new Date(sub.current_end * 1000).toISOString() : null,
+        ...(term ? { plan_term: term } : {}),
+        ...(tier ? { price_tier: tier } : {}),
       });
+    }
     case 'subscription.pending':
       return patch({ status: 'past_due' });
     case 'subscription.halted':
@@ -122,11 +130,24 @@ Deno.serve(async (req) => {
 
   const mapped = mapEventToEntitlement(event);
   if (mapped) {
-    await fetch(`${SUPABASE_URL}/rest/v1/entitlements?user_id=eq.${mapped.userId}`, {
+    const patchUrl = `${SUPABASE_URL}/rest/v1/entitlements?user_id=eq.${mapped.userId}`;
+    let res = await fetch(patchUrl, {
       method: 'PATCH',
       headers: { ...svc, Prefer: 'return=minimal' },
       body: JSON.stringify(mapped.patch),
     });
+    // plan_term / price_tier come from migration 0007. If it hasn't been run
+    // yet the PATCH is rejected as a whole — never let that block the plan
+    // flip itself, retry without the two informational columns.
+    if (!res.ok && ('plan_term' in mapped.patch || 'price_tier' in mapped.patch)) {
+      const { plan_term: _t, price_tier: _p, ...core } = mapped.patch;
+      res = await fetch(patchUrl, {
+        method: 'PATCH',
+        headers: { ...svc, Prefer: 'return=minimal' },
+        body: JSON.stringify(core),
+      });
+    }
+    if (!res.ok) return new Response('entitlement update failed', { status: 500 });
   }
 
   await fetch(`${SUPABASE_URL}/rest/v1/billing_events`, {

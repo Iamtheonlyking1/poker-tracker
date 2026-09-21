@@ -1541,7 +1541,22 @@ export function viewAccount() {
       // restart a chain of its own. NOT inside paintAccount either, which
       // redraw() calls on every interaction; chaining refresh().then(redraw)
       // there would restart itself forever regardless of navigation.
-      if (sb.isSignedIn() && nav.freshNav) ent.refresh().then(() => paintAccount(root, sb, au, boot, ent, up));
+      if (sb.isSignedIn() && nav.freshNav) {
+        ent.refresh().then(() => {
+          paintAccount(root, sb, au, boot, ent, up);
+          // the launch offer's state comes from the server — ask once per
+          // visit, and only when there's an upgrade card to price
+          if (ent.isPro()) return;
+          const bill = nav.state.billing || (nav.state.billing = { busy: false, err: '' });
+          bill.quote = null;
+          import('./billing.js')
+            .then((b) => b.getQuote())
+            .then((q) => { bill.quote = q; })
+            // couldn't ask: show list prices; checkout still charges the real amount
+            .catch(() => { bill.quote = { launchActive: false, launchEndsAt: null }; })
+            .then(() => paintAccount(root, sb, au, boot, ent, up));
+        });
+      }
     })
     .catch(() => root.replaceChildren(h('p', { class: 'muted' }, 'Sign-in isn’t available right now.')));
   return [toolHead('Account'), root, backbar()];
@@ -1566,13 +1581,13 @@ function paintAccount(root, sb, au, boot, ent, up) {
     const pro = ent.isPro();
     const bill = nav.state.billing || (nav.state.billing = { busy: false, err: '' });
 
-    const onUpgrade = async () => {
+    const onUpgrade = async (term) => {
       bill.busy = true;
       bill.err = '';
       redraw();
       try {
         const { startCheckout } = await import('./billing.js');
-        const res = await startCheckout();
+        const res = await startCheckout(term);
         bill.busy = false;
         if (res.completed) {
           nav.toast('Payment received — confirming…');
@@ -1630,6 +1645,9 @@ function paintAccount(root, sb, au, boot, ent, up) {
       up.proCard({
         busy: bill.busy,
         err: bill.err,
+        quote: bill.quote || null,
+        term: bill.term,
+        onPickTerm: (t) => { bill.term = t; redraw(); },
         onUpgrade: pro ? null : onUpgrade,
         onManage: canManage ? onManage : null,
       }),

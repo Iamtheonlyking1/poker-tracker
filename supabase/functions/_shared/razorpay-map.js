@@ -60,13 +60,21 @@ export function mapEventToEntitlement(event) {
 
   switch (type) {
     case 'subscription.activated':
-    case 'subscription.charged':
+    case 'subscription.charged': {
+      // which plan length / price tier this subscription was sold at — set by
+      // create-subscription in the subscription's notes, and carried on every
+      // renewal, so a launch-price customer stays identifiable as one
+      const term = ['1m', '3m', '6m', '12m'].includes(sub.notes.term) ? sub.notes.term : null;
+      const tier = ['launch', 'list'].includes(sub.notes.tier) ? sub.notes.tier : null;
       return patch({
         plan: 'pro',
         status: 'active',
         provider_customer_id: sub.customer_id || null,
         current_period_end: sub.current_end ? new Date(sub.current_end * 1000).toISOString() : null,
+        ...(term ? { plan_term: term } : {}),
+        ...(tier ? { price_tier: tier } : {}),
       });
+    }
     case 'subscription.pending':
       // a renewal payment failed but Razorpay is retrying — entitlements.isPro()
       // treats past_due as still-pro, so access continues through the grace window

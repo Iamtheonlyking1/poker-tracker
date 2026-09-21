@@ -5,38 +5,70 @@
 import { h } from './ui.js';
 import * as fx from './fx.js';
 import { isPro, current } from './entitlements.js';
+import { pricingRows, subscriptionPrice, fmtInr, BEST_VALUE_TERM } from './plans.js';
 
-export const PRO_PRICE = '₹300/mo';
-export const PRO_PRICE_ORIGINAL = '₹499/mo';
-export const PRO_DISCOUNT_LABEL = '40% off launch price';
+const fmtDate = (d) => d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 
 export function planBadge() {
   return h('span', { class: 'plan-badge' + (isPro() ? ' pro' : '') }, isPro() ? 'Pro' : 'Free');
 }
 
 /**
- * `state`: { busy, err, onUpgrade, onManage }. onUpgrade/onManage are called
- * with no args; this module doesn't know how billing.js works, just renders
- * whatever state the caller hands it.
+ * `state`: { busy, err, quote, term, onPickTerm, onUpgrade, onManage }.
+ * `quote` is { launchActive, launchEndsAt } from the server, or null while it
+ * loads. onPickTerm(term) / onUpgrade() / onManage() are called by the buttons;
+ * this module doesn't know how billing.js works, just renders what it's given.
  */
 export function proCard(state = {}) {
-  const { busy, err, onUpgrade, onManage } = state;
+  const { busy, err, quote, term, onPickTerm, onUpgrade, onManage } = state;
   const ent = current();
 
   if (isPro()) {
     const endsAt = ent.current_period_end ? new Date(ent.current_period_end) : null;
+    const sub = subscriptionPrice(ent.plan_term, ent.price_tier);
     return h('div', { class: 'card pro-card' },
       h('div', { class: 'pname sm', html: fx.icon('cloud') + 'Pro' }),
       h('div', { class: 'pmeta' }, 'Whole history synced · unlimited shared games · everything unlocked'),
-      endsAt
-        ? h('div', { class: 'pmeta' }, `Renews ${endsAt.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}`)
+      sub
+        ? h('div', { class: 'pmeta' }, `${sub.label} plan · ${fmtInr(sub.price)}${sub.months > 1 ? ` every ${sub.months} months` : ' a month'}`)
         : null,
+      sub && sub.tier === 'launch'
+        ? h('div', { class: 'banner info' }, 'Launch price — locked in for as long as you stay subscribed.')
+        : null,
+      endsAt ? h('div', { class: 'pmeta' }, `Renews ${fmtDate(endsAt)}`) : null,
       err ? h('div', { class: 'banner warn' }, err) : null,
       onManage
         ? h('button', { class: 'ghost wide', disabled: busy ? 'true' : null, html: busy ? 'Working…' : 'Cancel subscription', onclick: onManage })
         : null,
     );
   }
+
+  const ready = !!quote;
+  const rows = ready ? pricingRows(quote.launchActive) : [];
+  const picked = rows.find((r) => r.term === term) || rows.find((r) => r.term === BEST_VALUE_TERM) || rows[0];
+
+  const options = h('div', { class: 'plan-grid', role: 'radiogroup', 'aria-label': 'Plan length' },
+    ...rows.map((r) =>
+      h('button', {
+        type: 'button',
+        class: 'plan-opt' + (picked && r.term === picked.term ? ' on' : ''),
+        role: 'radio',
+        'aria-checked': picked && r.term === picked.term ? 'true' : 'false',
+        disabled: busy ? 'true' : null,
+        onclick: () => onPickTerm && onPickTerm(r.term),
+      },
+        h('span', { class: 'po-top' },
+          h('span', { class: 'po-label' }, r.label),
+          r.term === BEST_VALUE_TERM
+            ? h('span', { class: 'po-tag' }, 'Best value')
+            : r.savePct > 0 ? h('span', { class: 'po-tag soft' }, `Save ${r.savePct}%`) : null,
+        ),
+        h('span', { class: 'po-price' },
+          r.strike ? h('s', { class: 'po-strike' }, fmtInr(r.strike)) : null,
+          fmtInr(r.price),
+        ),
+        h('span', { class: 'po-per' }, `${fmtInr(r.perMonth)}/mo`),
+      )));
 
   return h('div', { class: 'card pro-card' },
     h('h2', {}, 'Poker Night Pro'),
@@ -45,10 +77,21 @@ export function proCard(state = {}) {
       h('li', {}, 'Unlimited shared games, no 8-seat cap'),
       h('li', {}, 'Hand logging, leagues, full stats & AI review as they land'),
     ),
-    h('p', { class: 'muted small', html: `<s>${PRO_PRICE_ORIGINAL}</s> ${PRO_PRICE} · ${PRO_DISCOUNT_LABEL} · cancel anytime` }),
+    ready ? options : h('p', { class: 'muted small' }, 'Loading prices…'),
+    ready
+      ? h('p', { class: 'muted small' },
+          quote.launchActive
+            ? `Launch price${quote.launchEndsAt ? ` until ${fmtDate(new Date(quote.launchEndsAt))}` : ''} — lock it in and it stays the same for as long as you stay subscribed. Cancel anytime.`
+            : 'Renews automatically. Cancel anytime.')
+      : null,
     err ? h('div', { class: 'banner warn' }, err) : null,
     onUpgrade
-      ? h('button', { class: 'primary wide', disabled: busy ? 'true' : null, html: busy ? 'Opening checkout…' : `Upgrade to Pro — ${PRO_PRICE}`, onclick: onUpgrade })
+      ? h('button', {
+          class: 'primary wide',
+          disabled: busy || !ready ? 'true' : null,
+          html: busy ? 'Opening checkout…' : picked ? `Upgrade to Pro — ${picked.label} · ${fmtInr(picked.price)}` : 'Upgrade to Pro',
+          onclick: () => onUpgrade(picked && picked.term),
+        })
       : null,
   );
 }

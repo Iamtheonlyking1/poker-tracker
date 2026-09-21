@@ -88,3 +88,21 @@ test('eventDedupeKey — prefers the payment id when a payment entity is present
   e.payload.payment = { entity: { id: 'pay_test1' } };
   assert.match(eventDedupeKey(e), /^subscription\.charged:pay_test1:/);
 });
+
+test('mapEventToEntitlement — carries plan term + price tier from notes on activate/charge', () => {
+  const m = mapEventToEntitlement(subEvent('subscription.charged', {
+    notes: { supabase_user_id: 'user-uuid-1', term: '6m', tier: 'launch' },
+  }));
+  assert.equal(m.patch.plan_term, '6m');
+  assert.equal(m.patch.price_tier, 'launch');
+});
+
+test('mapEventToEntitlement — unknown/missing term or tier are simply omitted', () => {
+  const bad = mapEventToEntitlement(subEvent('subscription.activated', {
+    notes: { supabase_user_id: 'user-uuid-1', term: '2m', tier: 'free-for-all' },
+  }));
+  assert.equal('plan_term' in bad.patch, false);
+  assert.equal('price_tier' in bad.patch, false);
+  const none = mapEventToEntitlement(subEvent('subscription.activated'));
+  assert.equal('plan_term' in none.patch, false);
+});

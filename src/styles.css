@@ -2252,3 +2252,69 @@ input.switch:focus-visible {
   width: auto;
   padding: 0 22px;
 }
+
+/* Pro plan picker */
+.plan-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 12px 0 8px;
+}
+.plan-opt {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 2px;
+  min-height: 92px;
+  padding: 10px 12px;
+  text-align: left;
+  background: rgba(0, 0, 0, 0.22);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.plan-opt.on {
+  border-color: var(--gold-deep);
+  background: rgba(231, 189, 92, 0.12);
+  box-shadow: 0 0 0 1px var(--gold-glow) inset;
+}
+.plan-opt[disabled] {
+  opacity: 0.6;
+}
+.po-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+.po-tag {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #1a1408;
+  background: var(--gold);
+  border-radius: 6px;
+  padding: 1px 6px;
+}
+.po-tag.soft {
+  color: var(--gold);
+  background: rgba(231, 189, 92, 0.16);
+}
+.po-price {
+  font-size: 1.15rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.po-strike {
+  margin-right: 6px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--muted);
+}
+.po-per {
+  font-size: 0.74rem;
+  color: var(--muted);
+}
