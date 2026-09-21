@@ -73,6 +73,9 @@ export function mapEventToEntitlement(event) {
         current_period_end: sub.current_end ? new Date(sub.current_end * 1000).toISOString() : null,
         ...(term ? { plan_term: term } : {}),
         ...(tier ? { price_tier: tier } : {}),
+        // payments made so far — how the app knows whether the launch price
+        // still applies to the next renewal
+        ...(Number.isInteger(sub.paid_count) ? { paid_count: sub.paid_count } : {}),
       });
     }
     case 'subscription.pending':

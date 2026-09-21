@@ -1,9 +1,15 @@
 // Pro plan catalogue + price maths. Pure (no DOM) so it's unit-tested.
 //
 // The amounts here are DISPLAY ONLY. What a customer is actually charged is
-// the amount on the Razorpay plan that create-subscription picks — keep the
-// two in step when prices change. Which tier (launch vs list) applies is
-// decided by the server clock; the client just asks (see billing.js quote()).
+// the Razorpay plan's amount (= list) minus the launch offer, if create-
+// subscription attached one — keep them in step when prices change. Which tier
+// applies is decided by the server clock; the client just asks (billing.js).
+//
+// Launch price = the first LAUNCH_PAYMENTS payments (the signup payment plus
+// ONE renewal), then the plan's full list price. LAUNCH_PAYMENTS must match the
+// "cycles" set on the Razorpay launch offers.
+
+export const LAUNCH_PAYMENTS = 2;
 
 export const PLANS = [
   { term: '1m', months: 1, label: '1 month', launch: 299, list: 499 },
@@ -40,9 +46,25 @@ export function pricingRows(launchActive) {
   });
 }
 
-/** What a stored subscription (entitlements.plan_term/price_tier) is paying. */
-export function subscriptionPrice(term, tier) {
+/**
+ * What a stored subscription (entitlements.plan_term / price_tier / paid_count)
+ * is paying, and what its NEXT payment will be. A launch subscription's next
+ * payment is still launch-priced only while fewer than LAUNCH_PAYMENTS
+ * payments have gone through.
+ */
+export function subscriptionPrice(term, tier, paidCount) {
   const p = planByTerm(term);
   if (!p || !['launch', 'list'].includes(tier)) return null;
-  return { term, tier, months: p.months, label: p.label, price: p[tier] };
+  const paid = Number.isInteger(paidCount) && paidCount > 0 ? paidCount : 1;
+  const launchLeft = tier === 'launch' ? Math.max(0, LAUNCH_PAYMENTS - paid) : 0;
+  return {
+    term,
+    tier,
+    months: p.months,
+    label: p.label,
+    launchPrice: p.launch,
+    listPrice: p.list,
+    launchLeft,
+    nextPrice: launchLeft > 0 ? p.launch : p.list,
+  };
 }

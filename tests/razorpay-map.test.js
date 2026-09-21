@@ -106,3 +106,9 @@ test('mapEventToEntitlement — unknown/missing term or tier are simply omitted'
   const none = mapEventToEntitlement(subEvent('subscription.activated'));
   assert.equal('plan_term' in none.patch, false);
 });
+
+test('mapEventToEntitlement — records paid_count so the app knows if launch price is used up', () => {
+  const m = mapEventToEntitlement(subEvent('subscription.charged', { paid_count: 2 }));
+  assert.equal(m.patch.paid_count, 2);
+  assert.equal('paid_count' in mapEventToEntitlement(subEvent('subscription.charged')).patch, false, 'omitted when absent');
+});

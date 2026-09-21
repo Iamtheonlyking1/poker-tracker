@@ -5,7 +5,7 @@
 import { h } from './ui.js';
 import * as fx from './fx.js';
 import { isPro, current } from './entitlements.js';
-import { pricingRows, subscriptionPrice, fmtInr, BEST_VALUE_TERM } from './plans.js';
+import { pricingRows, subscriptionPrice, fmtInr, BEST_VALUE_TERM, LAUNCH_PAYMENTS } from './plans.js';
 
 const fmtDate = (d) => d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 
@@ -25,15 +25,21 @@ export function proCard(state = {}) {
 
   if (isPro()) {
     const endsAt = ent.current_period_end ? new Date(ent.current_period_end) : null;
-    const sub = subscriptionPrice(ent.plan_term, ent.price_tier);
+    const sub = subscriptionPrice(ent.plan_term, ent.price_tier, ent.paid_count);
+    const every = sub && (sub.months > 1 ? `every ${sub.months} months` : 'a month');
     return h('div', { class: 'card pro-card' },
       h('div', { class: 'pname sm', html: fx.icon('cloud') + 'Pro' }),
       h('div', { class: 'pmeta' }, 'Whole history synced · unlimited shared games · everything unlocked'),
-      sub
-        ? h('div', { class: 'pmeta' }, `${sub.label} plan · ${fmtInr(sub.price)}${sub.months > 1 ? ` every ${sub.months} months` : ' a month'}`)
+      sub ? h('div', { class: 'pmeta' }, `${sub.label} plan`) : null,
+      sub && sub.launchLeft > 0
+        ? h('div', { class: 'banner info' },
+            `Launch price — your next renewal is ${fmtInr(sub.launchPrice)}. After that it's the regular ${fmtInr(sub.listPrice)} ${every}.`)
         : null,
-      sub && sub.tier === 'launch'
-        ? h('div', { class: 'banner info' }, 'Launch price — locked in for as long as you stay subscribed.')
+      sub && sub.tier === 'launch' && sub.launchLeft === 0
+        ? h('div', { class: 'pmeta' }, `Launch price used up — renews at the regular ${fmtInr(sub.listPrice)} ${every}.`)
+        : null,
+      sub && sub.tier === 'list'
+        ? h('div', { class: 'pmeta' }, `${fmtInr(sub.listPrice)} ${every}`)
         : null,
       endsAt ? h('div', { class: 'pmeta' }, `Renews ${fmtDate(endsAt)}`) : null,
       err ? h('div', { class: 'banner warn' }, err) : null,
@@ -81,7 +87,7 @@ export function proCard(state = {}) {
     ready
       ? h('p', { class: 'muted small' },
           quote.launchActive
-            ? `Launch price${quote.launchEndsAt ? ` until ${fmtDate(new Date(quote.launchEndsAt))}` : ''} — lock it in and it stays the same for as long as you stay subscribed. Cancel anytime.`
+            ? `Launch price${quote.launchEndsAt ? ` until ${fmtDate(new Date(quote.launchEndsAt))}` : ''} — covers your first payment and one renewal (${LAUNCH_PAYMENTS} payments), then the regular price. Cancel anytime.`
             : 'Renews automatically. Cancel anytime.')
       : null,
     err ? h('div', { class: 'banner warn' }, err) : null,

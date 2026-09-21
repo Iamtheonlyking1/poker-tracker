@@ -62,6 +62,7 @@ function sameEnt(a, b) {
     a.current_period_end === b.current_period_end &&
     a.plan_term === b.plan_term &&
     a.price_tier === b.price_tier &&
+    a.paid_count === b.paid_count &&
     JSON.stringify(a.limits || {}) === JSON.stringify(b.limits || {})
   );
 }
@@ -81,9 +82,9 @@ export async function refresh() {
     const base = 'plan,status,limits,provider,provider_subscription_id,current_period_end';
     let rows;
     try {
-      rows = await db.select('entitlements', `select=${base},plan_term,price_tier`);
+      rows = await db.select('entitlements', `select=${base},plan_term,price_tier,paid_count`);
     } catch (e) {
-      // plan_term/price_tier come from migration 0007 — until it has been run
+      // plan_term/price_tier/paid_count come from migration 0007 — until it has been run
       // the select is rejected; never let that read as "free" for a Pro user
       rows = await db.select('entitlements', `select=${base}`);
     }

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { PLANS, pricingRows, subscriptionPrice, planByTerm, fmtInr } from '../src/plans.js';
+import { PLANS, LAUNCH_PAYMENTS, pricingRows, subscriptionPrice, planByTerm, fmtInr } from '../src/plans.js';
 
 test('pricingRows — launch prices end in 99 and cross out the list price', () => {
   const rows = pricingRows(true);
@@ -36,11 +36,28 @@ test('launch is ~40% off list on every term', () => {
   }
 });
 
-test('subscriptionPrice — what a stored launch customer keeps paying', () => {
-  const s = subscriptionPrice('12m', 'launch');
-  assert.deepEqual([s.price, s.months, s.label], [2499, 12, '12 months']);
-  assert.equal(subscriptionPrice('12m', 'nope'), null);
-  assert.equal(subscriptionPrice('7m', 'launch'), null);
+test('subscriptionPrice — launch customer: next renewal still launch, then list', () => {
+  const first = subscriptionPrice('12m', 'launch', 1);
+  assert.deepEqual([first.launchLeft, first.nextPrice, first.listPrice], [1, 2499, 4199]);
+  const second = subscriptionPrice('12m', 'launch', 2);
+  assert.deepEqual([second.launchLeft, second.nextPrice], [0, 4199], 'launch used up after 2 payments');
+  const later = subscriptionPrice('12m', 'launch', 5);
+  assert.equal(later.launchLeft, 0);
+  assert.equal(later.nextPrice, 4199);
+});
+
+test('subscriptionPrice — unknown/missing paid count counts as the first payment', () => {
+  for (const c of [undefined, null, 0, 'x']) assert.equal(subscriptionPrice('1m', 'launch', c).launchLeft, LAUNCH_PAYMENTS - 1);
+});
+
+test('subscriptionPrice — list-tier customer never sees launch pricing', () => {
+  const s = subscriptionPrice('6m', 'list', 1);
+  assert.deepEqual([s.launchLeft, s.nextPrice], [0, 2399]);
+});
+
+test('subscriptionPrice — rejects unknown term/tier', () => {
+  assert.equal(subscriptionPrice('12m', 'nope', 1), null);
+  assert.equal(subscriptionPrice('7m', 'launch', 1), null);
   assert.equal(subscriptionPrice(null, null), null);
   assert.equal(planByTerm('zz'), null);
 });

@@ -79,6 +79,9 @@ function mapEventToEntitlement(event) {
         current_period_end: sub.current_end ? new Date(sub.current_end * 1000).toISOString() : null,
         ...(term ? { plan_term: term } : {}),
         ...(tier ? { price_tier: tier } : {}),
+        // payments made so far — how the app knows whether the launch price
+        // still applies to the next renewal
+        ...(Number.isInteger(sub.paid_count) ? { paid_count: sub.paid_count } : {}),
       });
     }
     case 'subscription.pending':
@@ -136,11 +139,11 @@ Deno.serve(async (req) => {
       headers: { ...svc, Prefer: 'return=minimal' },
       body: JSON.stringify(mapped.patch),
     });
-    // plan_term / price_tier come from migration 0007. If it hasn't been run
-    // yet the PATCH is rejected as a whole — never let that block the plan
-    // flip itself, retry without the two informational columns.
-    if (!res.ok && ('plan_term' in mapped.patch || 'price_tier' in mapped.patch)) {
-      const { plan_term: _t, price_tier: _p, ...core } = mapped.patch;
+    // plan_term / price_tier / paid_count come from migration 0007. If it
+    // hasn't been run yet the PATCH is rejected as a whole — never let that
+    // block the plan flip itself, retry without the informational columns.
+    if (!res.ok && ('plan_term' in mapped.patch || 'price_tier' in mapped.patch || 'paid_count' in mapped.patch)) {
+      const { plan_term: _t, price_tier: _p, paid_count: _c, ...core } = mapped.patch;
       res = await fetch(patchUrl, {
         method: 'PATCH',
         headers: { ...svc, Prefer: 'return=minimal' },
