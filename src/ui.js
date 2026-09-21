@@ -17,6 +17,24 @@ export const h = (tag, attrs = {}, ...kids) => {
   return el;
 };
 
+// text input + explicit Add button so nobody has to know to hit Enter.
+// Enter still works; `submit(trimmedValue)` is only called for non-empty text
+// and is responsible for clearing the input if it wants to.
+export function nameAdder(input, submit, label = 'Add') {
+  const go = () => {
+    const v = input.value.trim();
+    if (!v) return;
+    submit(v);
+    if (input.isConnected) input.focus();
+  };
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); go(); }
+  });
+  return h('div', { class: 'name-add' },
+    input,
+    h('button', { type: 'button', class: 'primary', onclick: go }, label));
+}
+
 export function escapeHtml(str) {
   return str.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }

@@ -2236,3 +2236,19 @@ input.switch:focus-visible {
     animation: none !important;
   }
 }
+
+/* name input + explicit Add button */
+.name-add {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+.name-add input {
+  flex: 1;
+  min-width: 0;
+}
+.name-add button {
+  flex: none;
+  width: auto;
+  padding: 0 22px;
+}

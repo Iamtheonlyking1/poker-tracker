@@ -26,7 +26,7 @@ import {
 import { net, totalIn, potIn, settle, reconciliation, kittyExtras } from './settle.js';
 import { summaryText, shareUrl, whatsappUrl, sessionFromUrl } from './share.js';
 import { fmtMoney, setCurrency, currencyName, currencySymbol } from './money.js';
-import { h, escapeHtml, fmtNet, netCount, avatar, fmtDuration } from './ui.js';
+import { h, escapeHtml, fmtNet, netCount, avatar, fmtDuration, nameAdder } from './ui.js';
 import * as fx from './fx.js';
 import { setNav, nav, TOOL_VIEWS, openCurrencyPicker, showQR, showResultsImage } from './tools.js';
 import { setSoundEnabled, chip as soundChip, cash as soundCash, fanfare as soundFanfare } from './sound.js';
@@ -246,14 +246,12 @@ function viewSetup() {
     renderList();
     renderRoster();
   };
-  const playerIn = h('input', {
-    type: 'text', placeholder: 'Add player name, press Enter', enterkeyhint: 'done', autocomplete: 'off',
-    onkeydown: (e) => {
-      if (e.key === 'Enter' && playerIn.value.trim()) {
-        addPending(playerIn.value);
-        playerIn.value = '';
-      }
-    },
+  const playerInput = h('input', {
+    type: 'text', placeholder: 'Player name', enterkeyhint: 'done', autocomplete: 'off',
+  });
+  const playerIn = nameAdder(playerInput, (name) => {
+    addPending(name);
+    playerInput.value = '';
   });
 
   // one-tap chips from the saved roster
@@ -394,14 +392,12 @@ function viewLive() {
     );
   });
 
-  const addName = h('input', {
+  const addNameInput = h('input', {
     type: 'text', placeholder: 'Late joiner name', enterkeyhint: 'done', autocomplete: 'off',
-    onkeydown: (e) => {
-      if (e.key === 'Enter' && addName.value.trim()) {
-        actAddLatePlayer(addName.value.trim());
-        addName.value = '';
-      }
-    },
+  });
+  const addName = nameAdder(addNameInput, (name) => {
+    actAddLatePlayer(name);
+    addNameInput.value = '';
   });
 
   const lg = state.liveGame;

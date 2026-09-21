@@ -1,7 +1,7 @@
 // Tournament screens: setup, the live blind clock, results, and the structure
 // editor. Uses the shared `nav` context from tools.js.
 
-import { h, avatar, escapeHtml } from './ui.js';
+import { h, avatar, escapeHtml, nameAdder } from './ui.js';
 import * as fx from './fx.js';
 import { fmtMoney, currencySymbol, currencyName, currencyCode, setCurrency } from './money.js';
 import { openCurrencyPicker, showResultsImage } from './tools.js';
@@ -178,8 +178,8 @@ export function viewTournamentSetup() {
     rosterRow.hidden = avail.length === 0;
     fx.attachRipples(rosterRow);
   };
-  const playerIn = h('input', { type: 'text', placeholder: 'Player name, press Enter', enterkeyhint: 'done', autocomplete: 'off',
-    onkeydown: (e) => { if (e.key === 'Enter' && playerIn.value.trim()) { addP(playerIn.value); playerIn.value = ''; } } });
+  const playerInput = h('input', { type: 'text', placeholder: 'Player name', enterkeyhint: 'done', autocomplete: 'off' });
+  const playerIn = nameAdder(playerInput, (name) => { addP(name); playerInput.value = ''; });
   renderList();
   renderRoster();
 
@@ -484,15 +484,13 @@ export function viewTournamentLive() {
       );
     });
 
-  const lateIn = h('input', { type: 'text', placeholder: 'Late entry name', enterkeyhint: 'done', autocomplete: 'off',
-    onkeydown: (e) => {
-      if (e.key === 'Enter' && lateIn.value.trim()) {
-        maybeSaveToRoster(lateIn.value.trim());
-        T.addLatePlayer(s, lateIn.value.trim());
-        save(s);
-        nav.render();
-      }
-    } });
+  const lateInput = h('input', { type: 'text', placeholder: 'Late entry name', enterkeyhint: 'done', autocomplete: 'off' });
+  const lateIn = nameAdder(lateInput, (name) => {
+    maybeSaveToRoster(name);
+    T.addLatePlayer(s, name);
+    save(s);
+    nav.render();
+  });
 
   if (nav.state.tShowPlayers == null) nav.state.tShowPlayers = false;
   const showPlayers = nav.state.tShowPlayers;

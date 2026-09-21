@@ -1,7 +1,7 @@
 // The poker study tools, rebuilt as native views in the felt/gold theme.
 // Each exported view returns a node array, same shape as app.js's game views.
 
-import { h, avatar } from './ui.js';
+import { h, avatar, nameAdder } from './ui.js';
 import * as fx from './fx.js';
 import { fmtMoney, currencySymbol, currencyCode, allCurrencies, currencyName, setCurrency } from './money.js';
 import * as poker from './poker.js';
@@ -1230,16 +1230,14 @@ export function viewRoster() {
   };
   render();
 
-  const addIn = h('input', {
-    type: 'text', placeholder: 'Player name, press Enter', enterkeyhint: 'done', autocomplete: 'off',
-    onkeydown: (e) => {
-      if (e.key === 'Enter' && addIn.value.trim()) {
-        upsertRosterPlayer({ name: addIn.value.trim() });
-        addIn.value = '';
-        render();
-        fx.haptic(10);
-      }
-    },
+  const addInput = h('input', {
+    type: 'text', placeholder: 'Player name', enterkeyhint: 'done', autocomplete: 'off',
+  });
+  const addIn = nameAdder(addInput, (name) => {
+    upsertRosterPlayer({ name });
+    addInput.value = '';
+    render();
+    fx.haptic(10);
   });
 
   return [
