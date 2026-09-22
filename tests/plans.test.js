@@ -39,10 +39,10 @@ test('pickPlan — no LAUNCH_ENDS_AT means list price (safe default)', () => {
   assert.equal(p.tier, 'list');
 });
 
-test('pickPlan — total_count keeps every term at ~40 years (safely under Razorpay\'s end-date cap)', () => {
+test('pickPlan — total_count keeps every term at ~25 years (under both Razorpay\'s card end-date cap and UPI\'s 30-year mandate cap)', () => {
   for (const t of Object.keys(TERMS)) {
     const p = pickPlan({ term: t, plansRaw: PLANS, launchEndsAt: ENDS, now: BEFORE });
-    assert.equal(p.totalCount * p.months, 480);
+    assert.equal(p.totalCount * p.months, 300);
   }
 });
 

@@ -43,10 +43,12 @@ function pickPlan(term) {
   const planId = plans && plans[term] && plans[term][tier];
   if (!planId || typeof planId !== 'string') return { error: 'Billing is not configured yet.', status: 503 };
   const months = TERMS[term];
-  // ~40 years of cycles, i.e. "until cancelled", whatever the cycle length.
-  // NOT ~100 (1200) — Razorpay rejects a subscription whose computed end date
-  // is past roughly year 2121; 100 years from a 2026 signup crosses that.
-  return { planId, tier, term, totalCount: Math.floor(480 / months) };
+  // ~25 years of cycles, i.e. "until cancelled", whatever the cycle length.
+  // Razorpay caps a subscription's computed end date at ~2121 for cards, and
+  // separately caps UPI Autopay mandates at 30 years from now no matter what
+  // — since the same total_count has to work for whichever method the
+  // customer picks at checkout, 25 years stays safely under both.
+  return { planId, tier, term, totalCount: Math.floor(300 / months) };
 }
 
 const CORS = {
