@@ -23,10 +23,12 @@ function loadCheckoutScript() {
 /**
  * Is the launch price still on offer? Asked of the server (it owns the clock
  * and the end date) so the prices we display match what checkout will charge.
- * Resolves { launchActive, launchEndsAt } — launchEndsAt is null when over.
+ * A separate, unauthenticated function from create-subscription — this needs
+ * to work before anyone has signed in, since pricing should be visible
+ * without an account. Resolves { launchActive, launchEndsAt } — null when over.
  */
 export async function getQuote() {
-  const q = await functions.invoke('create-subscription', { quote: true });
+  const q = await functions.invoke('get-quote', {});
   return { launchActive: !!q.launchActive, launchEndsAt: q.launchEndsAt || null };
 }
 

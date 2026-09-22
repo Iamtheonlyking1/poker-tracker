@@ -12,8 +12,10 @@
 //   LAUNCH_ENDS_AT  ISO date/time, e.g. 2026-12-01T00:00:00Z. Signups before it
 //     get the launch plan, after it the list plan. Unset = list price.
 // The client only says which TERM it wants — launch vs list is decided here by
-// this server's clock, never by the browser. Body {quote:true} just reports
-// whether launch pricing is still on, without creating anything.
+// this server's clock, never by the browser. Pricing itself (whether launch is
+// still on) is served by the separate "get-quote" function instead of a body
+// flag here, since this function requires a signed-in JWT and pricing needs
+// to be visible before anyone signs in.
 // razorpay-webhook is what moves a launch subscriber to the list plan once
 // their launch-priced payments run out (LAUNCH_PAYMENTS in _shared/plans.js).
 // (Pure logic mirrored in supabase/functions/_shared/plans.js, which is tested.)
@@ -82,12 +84,8 @@ Deno.serve(async (req) => {
   const userId = token && decodeJwtSub(token);
   if (!userId) return json({ error: 'not signed in' }, 401);
 
-  let body: { term?: string; quote?: boolean } = {};
+  let body: { term?: string } = {};
   try { body = await req.json(); } catch (_e) { body = {}; }
-
-  if (body.quote) {
-    return json({ launchActive: launchActive(), launchEndsAt: launchActive() ? LAUNCH_ENDS_AT : null });
-  }
 
   if (!RAZORPAY_KEY_ID || !RAZORPAY_KEY_SECRET) {
     return json({ error: 'Billing is not configured yet.' }, 503);

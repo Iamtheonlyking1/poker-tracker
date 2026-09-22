@@ -1576,6 +1576,17 @@ export function viewAccount() {
             .catch(() => { bill.quote = { launchActive: false, launchEndsAt: null }; })
             .then(() => paintAccount(root, sb, au, boot, ent, up));
         });
+      } else if (!sb.isSignedIn() && nav.freshNav) {
+        // pricing should be visible before anyone creates an account —
+        // get-quote needs no auth, so this works for a first-time visitor too
+        track('upgrade_view', { via: 'signed_out' });
+        const bill = nav.state.billing || (nav.state.billing = { busy: false, err: '' });
+        bill.quote = null;
+        import('./billing.js')
+          .then((b) => b.getQuote())
+          .then((q) => { bill.quote = q; })
+          .catch(() => { bill.quote = { launchActive: false, launchEndsAt: null }; })
+          .then(() => paintAccount(root, sb, au, boot, ent, up));
       }
     })
     .catch(() => root.replaceChildren(h('p', { class: 'muted' }, 'Sign-in isn’t available right now.')));
@@ -1725,8 +1736,11 @@ function paintAccount(root, sb, au, boot, ent, up) {
   const codeIn = h('input', { type: 'text', inputmode: 'numeric', autocomplete: 'one-time-code', maxlength: '6', placeholder: '6-digit code', enterkeyhint: 'go' });
   const pwIn = h('input', { type: 'password', autocomplete: 'current-password', placeholder: 'Password', enterkeyhint: 'go' });
 
+  const bill = nav.state.billing || (nav.state.billing = { busy: false, err: '' });
   const nodes = [
     h('p', { class: 'muted' }, 'Sign in to sync your games across devices. It’s free.'),
+    up.proCard({ quote: bill.quote || null, term: bill.term, onPickTerm: (t) => { bill.term = t; redraw(); } }),
+    h('p', { class: 'muted small' }, 'Sign in below to subscribe.'),
     st.err ? h('div', { class: 'banner warn' }, st.err) : null,
   ];
 
