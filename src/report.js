@@ -1,7 +1,11 @@
-// Lightweight error capture. Today it just buffers + warns; Phase 2 adds a
-// sampled POST to an Edge Function. No bundler, so no Sentry.
+// Lightweight error capture: buffers in memory, warns to console, and
+// forwards a sampled/capped copy to the owner analytics pipeline (analytics.js
+// -> ingest -> client_errors). No bundler, so no Sentry.
 
 const MAX_BUFFER = 50;
+const SAMPLE_RATE = 1; // 100% for now — traffic is low; lower this once it isn't
+let sentThisSession = 0;
+const MAX_SENT_PER_SESSION = 40; // a boot-loop bug shouldn't flood the table
 const buffer = [];
 let toast = null; // set by app.js so we don't import the UI layer here
 
@@ -32,6 +36,16 @@ export function report(err, ctx = {}) {
   if (entry.name === 'QuotaExceededError' && toast) {
     toast('Storage is full on this device — export a backup and clear old games.');
   }
+
+  if (sentThisSession < MAX_SENT_PER_SESSION && Math.random() < SAMPLE_RATE) {
+    sentThisSession += 1;
+    // dynamic import: report.js is pulled in very early/broadly, analytics.js
+    // shouldn't become a hard dependency of every module that reports an error
+    import('./analytics.js')
+      .then((a) => a.trackError(entry.message, entry.stack, ctx))
+      .catch(() => {});
+  }
+
   return entry;
 }
 

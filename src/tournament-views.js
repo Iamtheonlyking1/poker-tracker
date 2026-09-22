@@ -2,6 +2,7 @@
 // editor. Uses the shared `nav` context from tools.js.
 
 import { h, avatar, escapeHtml, nameAdder } from './ui.js';
+import { track } from './analytics.js';
 import * as fx from './fx.js';
 import { fmtMoney, currencySymbol, currencyName, currencyCode, setCurrency } from './money.js';
 import { openCurrencyPicker, showResultsImage } from './tools.js';
@@ -203,6 +204,7 @@ export function viewTournamentSetup() {
     clearActive();
     saveCurrencyPref(d.currency);
     save(s);
+    track('game_start', { mode: 'tournament', players: s.players.length });
     fx.haptic(15);
     nav.go('live');
   } });
@@ -607,6 +609,7 @@ export function viewTournamentResults(fromHistory) {
       h('div', { class: 'btn-row' },
         h('button', { class: 'wide', html: fx.icon('check') + 'Save to history & finish', onclick: () => {
           saveToHistory(s);
+          track('game_settle', { mode: 'tournament', players: s.players.length, pool: T.prizePool(s) });
           clearActive();
           nav.state.session = null;
           fx.haptic(20);

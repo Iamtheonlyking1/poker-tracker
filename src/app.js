@@ -29,6 +29,7 @@ import { fmtMoney, setCurrency, currencyName, currencySymbol } from './money.js'
 import { h, escapeHtml, fmtNet, netCount, avatar, fmtDuration, nameAdder } from './ui.js';
 import * as fx from './fx.js';
 import { setNav, nav, TOOL_VIEWS, openCurrencyPicker, showQR, showResultsImage } from './tools.js';
+import { track, install as installAnalytics } from './analytics.js';
 import { setSoundEnabled, chip as soundChip, cash as soundCash, fanfare as soundFanfare } from './sound.js';
 import { uuid } from './id.js';
 import * as store from './store.js';
@@ -744,20 +745,21 @@ function viewResults() {
   blocks.push(
     h('div', { style: 'height:16px' }),
     h('div', { class: 'btn-row' },
-      h('button', { class: 'primary wide', html: fx.icon('share') + 'Share to WhatsApp', onclick: () => window.open(whatsappUrl(s), '_blank') }),
+      h('button', { class: 'primary wide', html: fx.icon('share') + 'Share to WhatsApp', onclick: () => { track('share', { mode: 'cash', method: 'whatsapp' }); window.open(whatsappUrl(s), '_blank'); } }),
     ),
     h('div', { class: 'btn-row' },
-      h('button', { html: fx.icon('image') + 'Save image', onclick: () => showResultsImage(imageDataForCash(s)) }),
-      h('button', { html: fx.icon('qr') + 'Show QR', onclick: () => showQR(shareUrl(s)) }),
+      h('button', { html: fx.icon('image') + 'Save image', onclick: () => { track('share', { mode: 'cash', method: 'image' }); showResultsImage(imageDataForCash(s)); } }),
+      h('button', { html: fx.icon('qr') + 'Show QR', onclick: () => { track('share', { mode: 'cash', method: 'qr' }); showQR(shareUrl(s)); } }),
     ),
     h('div', { class: 'btn-row' },
-      h('button', { html: fx.icon('copy') + 'Copy summary', onclick: () => copy(summaryText(s)) }),
-      h('button', { html: fx.icon('copy') + 'Copy link', onclick: () => copy(shareUrl(s)) }),
+      h('button', { html: fx.icon('copy') + 'Copy summary', onclick: () => { track('share', { mode: 'cash', method: 'copy_summary' }); copy(summaryText(s)); } }),
+      h('button', { html: fx.icon('copy') + 'Copy link', onclick: () => { track('share', { mode: 'cash', method: 'copy_link' }); copy(shareUrl(s)); } }),
     ),
     h('div', { class: 'btn-row' },
       h('button', { class: 'wide', html: fx.icon('check') + 'Save to history & finish', onclick: async () => {
         if (state.liveGame) (await liveMod()).saveLiveToHistory(s);
         else { saveToHistory(s); clearActive(); }
+        track('game_settle', { mode: 'cash', players: s.players.length, pool: potIn(s.players) });
         fx.haptic(20);
         toast('Saved to history');
         state.session = null;
@@ -785,16 +787,20 @@ function viewJoin() {
     try {
       const m = await liveMod();
       await m.joinGame(code, nameIn.value.trim() || 'Player');
+      track('live_join', { outcome: 'success' });
       state.joinCode = null;
       go('live');
     } catch (e) {
       busy = false;
       const msg = String((e && (e.detail || e.message)) || '');
-      status.textContent = /FREE_LIMIT live_seats/.test(msg)
+      const full = /FREE_LIMIT live_seats/.test(msg);
+      const notFound = /no live game|not found/i.test(msg);
+      status.textContent = full
         ? 'This table is full — 8 seats on the free plan.'
-        : /no live game|not found/i.test(msg)
+        : notFound
           ? 'That code didn’t match a live game. Check it and try again.'
           : 'Could not join — check your connection.';
+      track('live_join', { outcome: 'error', reason: full ? 'full' : notFound ? 'not_found' : 'other' });
       report.report(e, { kind: 'live.join' });
       render();
     }
@@ -972,6 +978,7 @@ function render(opts = {}) {
   // already sitting here" — needed to do once-per-visit work without it
   // restarting on every remote-sync-driven re-render.
   nav.freshNav = isFreshNav;
+  if (isFreshNav) track('screen_view', { view });
 
   clearInterval(state._tick);
   state._tick = null;
@@ -1063,6 +1070,7 @@ function boot() {
 setNav({ go, toast, state, render });
 report.setToast(toast);
 report.install();
+installAnalytics();
 store.install();
 initInstall();
 runMigrations();

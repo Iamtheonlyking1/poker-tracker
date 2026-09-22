@@ -46,6 +46,10 @@ export function createEngine({ backend, store, deviceId, now = () => Date.now(),
     if (s === status) return;
     status = s;
     if (statusCb) statusCb(s);
+    // dynamic import, not a static one: this module is exercised directly in
+    // tests/sync-engine.test.js against an in-memory backend with no DOM —
+    // keep it free of anything that isn't purely dependency-injected
+    if (s === 'error') import('../analytics.js').then((a) => a.track('sync_error', { status: s })).catch(() => {});
   };
 
   // ---- shadow: {kind: {docId: clientUpdatedAt}} of what we believe is synced

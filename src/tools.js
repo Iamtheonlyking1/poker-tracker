@@ -2,6 +2,7 @@
 // Each exported view returns a node array, same shape as app.js's game views.
 
 import { h, avatar, nameAdder } from './ui.js';
+import { track } from './analytics.js';
 import * as fx from './fx.js';
 import { fmtMoney, currencySymbol, currencyCode, allCurrencies, currencyName, setCurrency } from './money.js';
 import * as poker from './poker.js';
@@ -230,9 +231,21 @@ export function viewHome() {
   const s = nav.state.session;
   const hist = loadHistory();
   const banner = installBanner(() => openSheet('Add to Home Screen', installGuideNodes()));
-  const tiles = syncConfigured()
-    ? [['account', 'user', 'Account', 'Sign in · sync your games'], ...TILES]
-    : TILES;
+  // owner-only Admin tile. entitlements.js is only ever loaded lazily (this
+  // app stays fully dark/offline until something touches sync) — resolve it
+  // async and re-render once, same pattern as the billing quote.
+  if (syncConfigured() && nav.state._isOwner === undefined) {
+    nav.state._isOwner = null; // pending — don't re-trigger every render
+    import('./entitlements.js').then((ent) => {
+      nav.state._isOwner = ent.isOwner();
+      if (nav.state._isOwner && nav.state.view === 'home') nav.render();
+    });
+  }
+  const tiles = [
+    ...(syncConfigured() ? [['account', 'user', 'Account', 'Sign in · sync your games']] : []),
+    ...TILES,
+    ...(nav.state._isOwner ? [['admin', 'graph', 'Admin', 'Usage, revenue, errors']] : []),
+  ];
   return [
     h('div', { class: 'home-head' },
       h('h1', { html: fx.icon('spade') + 'Poker Night' }),
@@ -1527,9 +1540,12 @@ function authErr(e) {
 
 function oauthRow(sb) {
   if (inStandalone()) return null; // OAuth redirects escape an installed PWA
+  // this is a full-page redirect, so only the attempt is observable here —
+  // there's no return-path callback to report success/failure from
+  const go = (provider) => { track('signin_method', { method: 'oauth', outcome: 'attempt', via: provider }); sb.auth.signInWithOAuth(provider); };
   return h('div', { class: 'btn-row' },
-    h('button', { class: 'ghost', html: 'Continue with Google', onclick: () => sb.auth.signInWithOAuth('google') }),
-    h('button', { class: 'ghost', html: 'Continue with Apple', onclick: () => sb.auth.signInWithOAuth('apple') }),
+    h('button', { class: 'ghost', html: 'Continue with Google', onclick: () => go('google') }),
+    h('button', { class: 'ghost', html: 'Continue with Apple', onclick: () => go('apple') }),
   );
 }
 
@@ -1550,6 +1566,7 @@ export function viewAccount() {
           // the launch offer's state comes from the server — ask once per
           // visit, and only when there's an upgrade card to price
           if (ent.isPro()) return;
+          track('upgrade_view');
           const bill = nav.state.billing || (nav.state.billing = { busy: false, err: '' });
           bill.quote = null;
           import('./billing.js')
@@ -1588,11 +1605,13 @@ function paintAccount(root, sb, au, boot, ent, up) {
       bill.busy = true;
       bill.err = '';
       redraw();
+      track('upgrade_checkout_open', { term });
       try {
         const { startCheckout } = await import('./billing.js');
         const res = await startCheckout(term);
         bill.busy = false;
         if (res.completed) {
+          track('upgrade_checkout_result', { term, outcome: 'paid' });
           nav.toast('Payment received — confirming…');
           // the webhook usually lands within a couple of seconds; poll a few times
           for (const delay of [1500, 3000, 5000, 8000]) {
@@ -1601,11 +1620,14 @@ function paintAccount(root, sb, au, boot, ent, up) {
             if (ent.isPro()) break;
           }
           if (!ent.isPro()) bill.err = 'Payment went through — plan should update within a minute. Reopen this screen if it doesn’t.';
+        } else {
+          track('upgrade_checkout_result', { term, outcome: 'dismissed' });
         }
         redraw();
       } catch (e) {
         bill.busy = false;
         bill.err = (e && e.message) || 'Checkout failed.';
+        track('upgrade_checkout_result', { term, outcome: 'error' });
         redraw();
       }
     };
@@ -1650,7 +1672,7 @@ function paintAccount(root, sb, au, boot, ent, up) {
         err: bill.err,
         quote: bill.quote || null,
         term: bill.term,
-        onPickTerm: (t) => { bill.term = t; redraw(); },
+        onPickTerm: (t) => { bill.term = t; track('upgrade_pick_term', { term: t }); redraw(); },
         onUpgrade: pro ? null : onUpgrade,
         onManage: canManage ? onManage : null,
       }),
@@ -1718,10 +1740,13 @@ function paintAccount(root, sb, au, boot, ent, up) {
       busy(true);
       try {
         await (creating ? sb.auth.signUpWithPassword(email, pw) : sb.auth.signInWithPassword(email, pw));
+        track('signin_method', { method: 'password', outcome: 'success', via: creating ? 'signup' : 'signin' });
+        if (creating) track('signup', { method: 'password' });
         nav.state.acct = null;
         nav.toast('Signed in');
         nav.go('home');
       } catch (e) {
+        track('signin_method', { method: 'password', outcome: 'error', via: creating ? 'signup' : 'signin', reason: String((e && e.status) || 'error') });
         fail(e);
       }
     };
@@ -1774,10 +1799,12 @@ function paintAccount(root, sb, au, boot, ent, up) {
       busy(true);
       try {
         await sb.auth.verifyOtp(st.email, c);
+        track('signin_method', { method: 'otp', outcome: 'success' });
         nav.state.acct = null;
         nav.toast('Signed in');
         nav.go('home');
       } catch (e) {
+        track('signin_method', { method: 'otp', outcome: 'error', reason: String((e && e.status) || 'error') });
         fail(e);
       }
     };
@@ -1840,7 +1867,7 @@ function hubView(title, tabs, stateKey) {
   const seg = h('div', { class: 'seg seg-4' },
     ...tabs.map(([key, , label]) =>
       h('button', { class: 'seg-btn' + (tab === key ? ' on' : ''),
-        onclick: () => { nav.state[stateKey] = key; nav.render(); } }, label)));
+        onclick: () => { nav.state[stateKey] = key; track('tool_open', { tool: title, tab: label }); nav.render(); } }, label)));
   const active = tabs.find(([key]) => key === tab) || tabs[0];
   return [toolHead(title), seg, ...hubBody(active[1]), backbar()];
 }
@@ -1865,6 +1892,113 @@ export function viewStudyHub() {
   return hubView('Study', STUDY_TABS, 'studyTab');
 }
 
+// ---------- Admin (owner-only: usage + business + health) ----------
+
+const fmtDT = (iso) => new Date(iso).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
+
+function adminBusiness(d) {
+  const termLabel = { '1m': '1 month', '3m': '3 months', '6m': '6 months', '12m': '12 months' };
+  const byTerm = Object.entries(d.pro_by_term || {});
+  return [
+    h('div', { class: 'stat-grid' },
+      statBox(d.signups, 'Signups'),
+      statBox(d.active_users, 'Active users'),
+      statBox(d.pro_active, 'Pro (active)', 'gold'),
+      statBox(d.launch_price_active, 'On launch price'),
+    ),
+    h('div', { class: 'card' },
+      h('h2', {}, 'Pro by plan length'),
+      byTerm.length
+        ? refTable(['Term', 'Count'], byTerm.map(([t, n]) => [termLabel[t] || t, String(n)]))
+        : h('p', { class: 'muted empty' }, 'No Pro subscribers yet.'),
+    ),
+    h('div', { class: 'card' },
+      h('h2', {}, 'Payment events'),
+      Object.keys(d.payment_events || {}).length
+        ? refTable(['Event', 'Count'], Object.entries(d.payment_events).map(([k, n]) => [k, String(n)]))
+        : h('p', { class: 'muted empty' }, 'No billing activity yet.'),
+      h('p', { class: 'muted small' }, `${d.canceled_recent} cancellation${d.canceled_recent === 1 ? '' : 's'} in this window.`),
+    ),
+  ];
+}
+
+function adminUsage(d) {
+  return [
+    h('div', { class: 'stat-grid' },
+      statBox(d.games_created, 'Games created'),
+      statBox(d.live_games_created, 'Live tables'),
+    ),
+    h('div', { class: 'card' },
+      h('h2', {}, 'Top events'),
+      (d.top_events || []).length
+        ? refTable(['Event', 'Count'], d.top_events.map((e) => [e.name, String(e.n)]))
+        : h('p', { class: 'muted empty' }, 'No events recorded in this window.'),
+    ),
+  ];
+}
+
+function adminHealth(d) {
+  return [
+    h('div', { class: 'card' },
+      h('h2', {}, 'Top errors'),
+      (d.top_errors || []).length
+        ? refTable(['Message', 'Count', 'Last seen'], d.top_errors.map((e) => [e.message, String(e.n), fmtDT(e.last_at)]))
+        : h('p', { class: 'muted empty' }, 'No errors reported in this window — good.'),
+    ),
+    h('div', { class: 'card' },
+      h('h2', {}, 'Recent events'),
+      h('div', { class: 'notes' },
+        ...(d.recent_events || []).slice(0, 20).map((e) =>
+          h('div', { class: 'note' },
+            h('b', {}, e.name),
+            h('span', {}, `${fmtDT(e.at)}${Object.keys(e.props || {}).length ? ' · ' + JSON.stringify(e.props) : ''}`),
+          )),
+      ),
+    ),
+  ];
+}
+
+const ADMIN_TABS = [
+  ['business', adminBusiness, 'Business'],
+  ['usage', adminUsage, 'Usage'],
+  ['health', adminHealth, 'Health'],
+];
+
+export function viewAdmin() {
+  const st = nav.state.admin || (nav.state.admin = { tab: 'business', loading: true, data: null, err: '', days: 30 });
+  const root = h('div', {});
+  const redraw = () => root.replaceChildren(...body());
+
+  const seg = h('div', { class: 'seg' },
+    ...ADMIN_TABS.map(([key, , label]) =>
+      h('button', { class: 'seg-btn' + (st.tab === key ? ' on' : ''),
+        onclick: () => { st.tab = key; redraw(); } }, label)));
+
+  function body() {
+    if (st.loading) return [seg, h('p', { class: 'muted' }, 'Loading…')];
+    if (st.err) return [seg, h('div', { class: 'banner warn' }, st.err)];
+    if (!st.data) return [seg, h('p', { class: 'muted' }, 'Owner access only.')];
+    const render = ADMIN_TABS.find(([key]) => key === st.tab)[1];
+    return [
+      h('p', { class: 'muted small' }, `Last ${st.days} days · as of ${fmtDT(st.data.since)}`),
+      seg,
+      ...render(st.data),
+    ];
+  }
+
+  if (nav.freshNav) {
+    st.loading = true;
+    st.err = '';
+    import('./supabase.js')
+      .then((sb) => sb.db.rpc('admin_overview', { days: st.days }))
+      .then((data) => { st.data = data; st.loading = false; redraw(); })
+      .catch((e) => { st.err = (e && e.message) || 'Could not load — owner access only.'; st.loading = false; redraw(); });
+  }
+
+  root.replaceChildren(...body());
+  return [toolHead('Admin'), root, backbar()];
+}
+
 export const TOOL_VIEWS = {
   home: viewHome,
   account: viewAccount,
@@ -1874,4 +2008,5 @@ export const TOOL_VIEWS = {
   calchub: viewCalculators,
   studyhub: viewStudyHub,
   sessions: viewSessions,
+  admin: viewAdmin,
 };
