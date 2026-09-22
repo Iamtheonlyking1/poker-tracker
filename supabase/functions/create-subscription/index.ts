@@ -5,17 +5,17 @@
 //
 // Secrets to set (this function, or the project-wide Secrets page):
 //   RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET
-//   RAZORPAY_PLANS   JSON, per term ONE plan at the regular price plus the
-//     launch offer (flat discount, "Limited cycles" = 2) that turns it into the
-//     launch price:
-//     {"1m":{"plan":"plan_..","launchOffer":"offer_.."},"3m":{...},"6m":{...},"12m":{...}}
+//   RAZORPAY_PLANS   JSON, TWO Razorpay plans per term — launch price and list
+//     price — since this Razorpay account has no Subscription Offers feature
+//     to attach a temporary discount to a single plan:
+//     {"1m":{"launch":"plan_..","list":"plan_.."},"3m":{...},"6m":{...},"12m":{...}}
 //   LAUNCH_ENDS_AT  ISO date/time, e.g. 2026-12-01T00:00:00Z. Signups before it
-//     get the launch offer attached, after it none. Unset = no offer.
-// A launch customer therefore pays launch price for their first payment and
-// ONE renewal; Razorpay reverts them to the plan's full price after that.
+//     get the launch plan, after it the list plan. Unset = list price.
 // The client only says which TERM it wants — launch vs list is decided here by
 // this server's clock, never by the browser. Body {quote:true} just reports
-// whether the launch offer is still on, without creating anything.
+// whether launch pricing is still on, without creating anything.
+// razorpay-webhook is what moves a launch subscriber to the list plan once
+// their launch-priced payments run out (LAUNCH_PAYMENTS in _shared/plans.js).
 // (Pure logic mirrored in supabase/functions/_shared/plans.js, which is tested.)
 // SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are provided automatically —
 // don't set those yourself.
@@ -40,17 +40,11 @@ function pickPlan(term) {
   let plans = null;
   try { plans = RAZORPAY_PLANS ? JSON.parse(RAZORPAY_PLANS) : null; } catch (_e) { plans = null; }
   const tier = launchActive() ? 'launch' : 'list';
-  const entry = plans && plans[term];
-  const planId = entry && entry.plan;
+  const planId = plans && plans[term] && plans[term][tier];
   if (!planId || typeof planId !== 'string') return { error: 'Billing is not configured yet.', status: 503 };
-  let offerId = null;
-  if (tier === 'launch') {
-    offerId = entry.launchOffer;
-    if (!offerId || typeof offerId !== 'string') return { error: 'Billing is not configured yet.', status: 503 };
-  }
   const months = TERMS[term];
   // ~100 years of cycles, i.e. "until cancelled", whatever the cycle length
-  return { planId, offerId, tier, term, totalCount: Math.floor(1200 / months) };
+  return { planId, tier, term, totalCount: Math.floor(1200 / months) };
 }
 
 const CORS = {
@@ -115,7 +109,6 @@ Deno.serve(async (req) => {
     headers: { Authorization: rzpAuth, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       plan_id: pick.planId,
-      ...(pick.offerId ? { offer_id: pick.offerId } : {}),
       customer_notify: 1,
       total_count: pick.totalCount,
       // term + tier ride along on every renewal event so the webhook can

@@ -112,3 +112,14 @@ test('mapEventToEntitlement — records paid_count so the app knows if launch pr
   assert.equal(m.patch.paid_count, 2);
   assert.equal('paid_count' in mapEventToEntitlement(subEvent('subscription.charged')).patch, false, 'omitted when absent');
 });
+
+test('mapEventToEntitlement — carries subscriptionId/term/tier/paidCount for the caller\'s downgrade decision', () => {
+  const m = mapEventToEntitlement(subEvent('subscription.charged', {
+    paid_count: 2,
+    notes: { supabase_user_id: 'user-uuid-1', term: '12m', tier: 'launch' },
+  }));
+  assert.equal(m.subscriptionId, 'sub_test1');
+  assert.equal(m.term, '12m');
+  assert.equal(m.tier, 'launch');
+  assert.equal(m.paidCount, 2);
+});

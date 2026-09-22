@@ -16,13 +16,38 @@
 // Razorpay shows a Webhook Secret when you save it — put that in this
 // function's secrets as RAZORPAY_WEBHOOK_SECRET.
 //
+// This function ALSO does the launch->list price switch: this Razorpay
+// account has no Subscription Offers feature, so instead of one plan with a
+// temporary discount, there are two plans per term (launch price, list
+// price). The moment a launch subscriber's paid_count reaches LAUNCH_PAYMENTS
+// (2, see _shared/plans.js), this schedules the subscription onto the list
+// plan for its NEXT cycle via Razorpay's subscription-update API. Needs the
+// same RAZORPAY_KEY_ID/RAZORPAY_KEY_SECRET as create-subscription, plus
+// RAZORPAY_PLANS (to look up the list plan id for the term).
+//
 // The mapping/signature logic here is mirrored in
-// supabase/functions/_shared/razorpay-map.js, which is what's unit-tested
-// (tests/razorpay-map.test.js) — keep the two in sync if you change either.
+// supabase/functions/_shared/razorpay-map.js and _shared/plans.js, which are
+// what's unit-tested (tests/razorpay-map.test.js, tests/plans.test.js) —
+// keep the inline copies here in sync if you change either.
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 const WEBHOOK_SECRET = Deno.env.get('RAZORPAY_WEBHOOK_SECRET');
+const RAZORPAY_KEY_ID = Deno.env.get('RAZORPAY_KEY_ID');
+const RAZORPAY_KEY_SECRET = Deno.env.get('RAZORPAY_KEY_SECRET');
+const RAZORPAY_PLANS = Deno.env.get('RAZORPAY_PLANS');
+const LAUNCH_PAYMENTS = 2; // must match _shared/plans.js
+
+function listPlanFor(term) {
+  let plans = null;
+  try { plans = RAZORPAY_PLANS ? JSON.parse(RAZORPAY_PLANS) : null; } catch (_e) { plans = null; }
+  const id = plans && plans[term] && plans[term].list;
+  return typeof id === 'string' ? id : null;
+}
+
+function shouldSwitchToList(tier, paidCount) {
+  return tier === 'launch' && Number.isInteger(paidCount) && paidCount >= LAUNCH_PAYMENTS;
+}
 
 function hex(buf) {
   return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
@@ -72,7 +97,7 @@ function mapEventToEntitlement(event) {
       // renewal, so a launch-price customer stays identifiable as one
       const term = ['1m', '3m', '6m', '12m'].includes(sub.notes.term) ? sub.notes.term : null;
       const tier = ['launch', 'list'].includes(sub.notes.tier) ? sub.notes.tier : null;
-      return patch({
+      const result = patch({
         plan: 'pro',
         status: 'active',
         provider_customer_id: sub.customer_id || null,
@@ -83,6 +108,11 @@ function mapEventToEntitlement(event) {
         // still applies to the next renewal
         ...(Number.isInteger(sub.paid_count) ? { paid_count: sub.paid_count } : {}),
       });
+      result.subscriptionId = sub.id;
+      result.term = term;
+      result.tier = tier;
+      result.paidCount = Number.isInteger(sub.paid_count) ? sub.paid_count : null;
+      return result;
     }
     case 'subscription.pending':
       return patch({ status: 'past_due' });
@@ -151,6 +181,42 @@ Deno.serve(async (req) => {
       });
     }
     if (!res.ok) return new Response('entitlement update failed', { status: 500 });
+
+    // launch price used up — schedule the switch to the list plan for the
+    // NEXT cycle. Best-effort: a failure here doesn't fail the webhook (the
+    // entitlement update above already succeeded and is what matters most),
+    // and shouldSwitchToList's >= check means the NEXT charge retries this
+    // automatically if it doesn't go through now.
+    if (shouldSwitchToList(mapped.tier, mapped.paidCount) && RAZORPAY_KEY_ID && RAZORPAY_KEY_SECRET) {
+      const listPlanId = mapped.term ? listPlanFor(mapped.term) : null;
+      if (listPlanId) {
+        try {
+          const rzpAuth = 'Basic ' + btoa(`${RAZORPAY_KEY_ID}:${RAZORPAY_KEY_SECRET}`);
+          const switchRes = await fetch(`https://api.razorpay.com/v1/subscriptions/${mapped.subscriptionId}`, {
+            method: 'PATCH',
+            headers: { Authorization: rzpAuth, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              plan_id: listPlanId,
+              schedule_change_at: 'cycle_end',
+              // rewrite notes so the NEXT webhook event already reports
+              // tier: 'list' — this is what stops shouldSwitchToList from
+              // re-triggering once the switch has actually gone through
+              notes: { supabase_user_id: mapped.userId, term: mapped.term, tier: 'list' },
+            }),
+          });
+          if (switchRes.ok) {
+            // don't wait for a future event to reflect this — we know now
+            await fetch(patchUrl, {
+              method: 'PATCH',
+              headers: { ...svc, Prefer: 'return=minimal' },
+              body: JSON.stringify({ price_tier: 'list' }),
+            }).catch(() => {});
+          }
+        } catch (_e) {
+          /* best-effort — next charge retries */
+        }
+      }
+    }
   }
 
   await fetch(`${SUPABASE_URL}/rest/v1/billing_events`, {

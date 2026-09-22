@@ -66,7 +66,7 @@ export function mapEventToEntitlement(event) {
       // renewal, so a launch-price customer stays identifiable as one
       const term = ['1m', '3m', '6m', '12m'].includes(sub.notes.term) ? sub.notes.term : null;
       const tier = ['launch', 'list'].includes(sub.notes.tier) ? sub.notes.tier : null;
-      return patch({
+      const result = patch({
         plan: 'pro',
         status: 'active',
         provider_customer_id: sub.customer_id || null,
@@ -77,6 +77,13 @@ export function mapEventToEntitlement(event) {
         // still applies to the next renewal
         ...(Number.isInteger(sub.paid_count) ? { paid_count: sub.paid_count } : {}),
       });
+      // not part of the entitlements patch — the caller (razorpay-webhook)
+      // uses these to decide whether to schedule the launch->list plan switch
+      result.subscriptionId = sub.id;
+      result.term = term;
+      result.tier = tier;
+      result.paidCount = Number.isInteger(sub.paid_count) ? sub.paid_count : null;
+      return result;
     }
     case 'subscription.pending':
       // a renewal payment failed but Razorpay is retrying — entitlements.isPro()
