@@ -136,18 +136,20 @@ export const auth = {
     await req(`/auth/v1/otp?redirect_to=${redirect}`, {
       method: 'POST',
       auth: false,
-      body: { email, create_user: true, should_create_user: true, options: { email_redirect_to: appUrl() } },
+      body: { email, should_create_user: true },
     });
   },
 
   /**
-   * Exchange the 6-digit code for a session. Whether the OTP is minted as
-   * 'email', 'magiclink' or 'signup' depends on server config, so try each.
+   * Exchange the 6-digit code for a session. 'email' is correct for both new
+   * and existing users on current GoTrue; 'signup' is the one real fallback
+   * (a brand-new account can occasionally classify differently) — capped at
+   * two attempts so a wrong digit costs one request, not three.
    */
   async verifyOtp(email, token) {
     const clean = String(token || '').replace(/\s/g, '');
     let lastErr;
-    for (const type of ['email', 'magiclink', 'signup']) {
+    for (const type of ['email', 'signup']) {
       try {
         const data = await req('/auth/v1/verify', {
           method: 'POST',
@@ -158,7 +160,7 @@ export const auth = {
       } catch (e) {
         lastErr = e;
         // 400/401/403/404 = "wrong type or bad code" — try the next type;
-        // anything else (network, 500) is a real failure
+        // anything else (network, 429, 500) is a real failure, stop here
         if (![400, 401, 403, 404, 422].includes(e.status)) throw e;
       }
     }
