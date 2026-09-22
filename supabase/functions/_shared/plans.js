@@ -65,8 +65,10 @@ export function pickPlan({ term, plansRaw, launchEndsAt, now = Date.now() }) {
   const planId = plans[term] && plans[term][tier];
   if (!planId || typeof planId !== 'string') throw fail('Billing is not configured yet.', 503);
   const months = TERMS[term];
-  // ~100 years of cycles, i.e. "until cancelled", whatever the cycle length
-  return { planId, tier, term, months, totalCount: Math.floor(1200 / months) };
+  // ~40 years of cycles, i.e. "until cancelled", whatever the cycle length.
+  // NOT ~100 (1200) — Razorpay rejects a subscription whose computed end date
+  // is past roughly year 2121; 100 years from a 2026 signup crosses that.
+  return { planId, tier, term, months, totalCount: Math.floor(480 / months) };
 }
 
 /** The list-price plan id for `term`, or null if not configured. Used by the

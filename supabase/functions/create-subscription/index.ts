@@ -43,8 +43,10 @@ function pickPlan(term) {
   const planId = plans && plans[term] && plans[term][tier];
   if (!planId || typeof planId !== 'string') return { error: 'Billing is not configured yet.', status: 503 };
   const months = TERMS[term];
-  // ~100 years of cycles, i.e. "until cancelled", whatever the cycle length
-  return { planId, tier, term, totalCount: Math.floor(1200 / months) };
+  // ~40 years of cycles, i.e. "until cancelled", whatever the cycle length.
+  // NOT ~100 (1200) — Razorpay rejects a subscription whose computed end date
+  // is past roughly year 2121; 100 years from a 2026 signup crosses that.
+  return { planId, tier, term, totalCount: Math.floor(480 / months) };
 }
 
 const CORS = {
