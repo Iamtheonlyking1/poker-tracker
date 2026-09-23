@@ -80,7 +80,7 @@ export function proCard(state = {}) {
     h('h2', {}, 'Poker Night Pro'),
     h('ul', { class: 'pro-list' },
       h('li', {}, 'Your whole game history synced — not just the last 10'),
-      h('li', {}, 'Unlimited shared games, no 8-seat cap'),
+      h('li', {}, 'Unlimited shared games, no 6-seat cap'),
       h('li', {}, 'Hand logging, leagues, full stats & AI review as they land'),
     ),
     ready ? options : h('p', { class: 'muted small' }, 'Loading prices…'),

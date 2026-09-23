@@ -11,6 +11,7 @@ import {
   loadHistory,
   loadSessionLog,
   addSessionLog,
+  updateSessionLog,
   deleteSessionLog,
   loadQuizScore,
   saveQuizScore,
@@ -1094,6 +1095,8 @@ function ptypeTable() {
   return h('div', { class: 'scroll-x' }, t);
 }
 
+const FREE_SESSION_LOG_CAP = 10;
+
 export function viewSessions() {
   const sym = () => currencySymbol(currencyCode());
   let list = loadSessionLog();
@@ -1107,6 +1110,19 @@ export function viewSessions() {
   const cashIn = h('input', { type: 'number', inputmode: 'decimal', placeholder: 'e.g. 145', min: '0' });
   const hoursIn = h('input', { type: 'number', inputmode: 'decimal', placeholder: 'e.g. 3.5', min: '0', step: '0.25' });
   const notesIn = h('input', { type: 'text', placeholder: 'Reads, leaks, observations…' });
+
+  // Which currency THIS entry was played in — defaults to the app's main
+  // currency (no conversion needed, no network). Pick a different one and
+  // the amounts above get converted into the main currency at today's rate
+  // when you hit Add (see fxrates.js) — the main-currency numbers are what's
+  // stored/charted, the as-entered ones ride along for display only.
+  let entryCur = currencyCode();
+  const curBtn = h('button', { class: 'ghost wide field-btn' });
+  const curBtnLabel = () =>
+    `<span class="cur-sym">${currencySymbol(entryCur)}</span><span class="cur-name">${currencyName(entryCur)}</span>` +
+    `<span class="cur-code">${entryCur}</span>${fx.icon('forward')}`;
+  curBtn.innerHTML = curBtnLabel();
+  curBtn.onclick = () => openCurrencyPicker(entryCur, (code) => { entryCur = code; curBtn.innerHTML = curBtnLabel(); });
 
   const totals = h('div', { class: 'stat-grid' });
   const logWrap = h('div', {});
@@ -1124,21 +1140,61 @@ export function viewSessions() {
       statBox(buyins > 0 ? ((profit / buyins) * 100).toFixed(1) + '%' : '—', 'Avg ROI'),
     );
   };
+  const changeRowCurrency = (s) => {
+    openCurrencyPicker(s.origCurrency || s.currency || currencyCode(), async (code) => {
+      const main = currencyCode();
+      // Re-derive from the as-entered numbers (or today's stored amount, for
+      // an entry that's never had a currency change before) — never compound
+      // conversions on top of an already-converted number.
+      const origBuyin = s.origCurrency ? s.origBuyin : s.buyin;
+      const origCashout = s.origCurrency ? s.origCashout : s.cashout;
+      if (code === main) {
+        list = updateSessionLog(s.id, {
+          buyin: origBuyin, cashout: origCashout, currency: main,
+          origCurrency: null, origBuyin: null, origCashout: null, fxRate: null, fxAt: null,
+        });
+        redraw();
+        return;
+      }
+      try {
+        const { convert } = await import('./fxrates.js');
+        const b = await convert(origBuyin, code, main);
+        const c = await convert(origCashout, code, main);
+        list = updateSessionLog(s.id, {
+          buyin: b.amount, cashout: c.amount, currency: main,
+          origCurrency: code, origBuyin, origCashout, fxRate: b.rate, fxAt: new Date().toISOString(),
+        });
+        redraw();
+      } catch (e) {
+        nav.toast('Could not fetch a conversion rate — check your connection and try again.');
+      }
+    });
+  };
   const renderLog = () => {
     if (!list.length) { logWrap.replaceChildren(h('p', { class: 'muted empty' }, 'No sessions yet. Add your first above.')); return; }
     const table = h('table', { class: 'sess-table' });
     table.append(h('tr', {}, ...['Date', 'Game', 'Buy-in', 'Cash-out', 'P/L', 'Hrs', ''].map((x) => h('th', {}, x))));
     [...list].reverse().forEach((s) => {
       const p = s.cashout - s.buyin;
+      const foreign = s.origCurrency && s.origCurrency !== currencyCode();
       table.append(h('tr', {},
         h('td', {}, s.date),
-        h('td', {}, s.game || '—'),
+        h('td', {},
+          s.game || '—',
+          foreign
+            ? h('div', { class: 'muted small' }, `${currencySymbol(s.origCurrency)}${s.origBuyin}/${s.origCashout} ${s.origCurrency} @ ${s.fxRate ? s.fxRate.toFixed(3) : '?'}`)
+            : null,
+        ),
         h('td', {}, fmtAbs(s.buyin)),
         h('td', {}, fmtAbs(s.cashout)),
         h('td', { class: p >= 0 ? 'net-win' : 'net-loss' }, fmt(p)),
         h('td', {}, (s.hours || 0) + 'h'),
-        h('td', {}, h('button', { class: 'sm ghost icon-only', 'aria-label': 'Delete session', html: fx.icon('trash'),
-          onclick: () => { if (confirm('Delete this session?')) { list = deleteSessionLog(s.id); redraw(); } } })),
+        h('td', {},
+          h('button', { class: 'sm ghost icon-only', 'aria-label': 'Change currency', html: fx.icon('currency'),
+            onclick: () => changeRowCurrency(s) }),
+          h('button', { class: 'sm ghost icon-only', 'aria-label': 'Delete session', html: fx.icon('trash'),
+            onclick: () => { if (confirm('Delete this session?')) { list = deleteSessionLog(s.id); redraw(); } } }),
+        ),
       ));
     });
     logWrap.replaceChildren(h('div', { class: 'scroll-x' }, table));
@@ -1152,18 +1208,49 @@ export function viewSessions() {
       drawBarChart(barCanvas, list.map((s) => s.cashout - s.buyin), sym());
     });
   };
-  const add = () => {
+  const pro = isProCached();
+  const atCap = !pro && list.length >= FREE_SESSION_LOG_CAP;
+  const addBtn = h('button', { class: 'primary wide', html: fx.icon('plus') + 'Add session' });
+  const add = async () => {
+    if (atCap) { nav.toast(`Free plan logs up to ${FREE_SESSION_LOG_CAP} sessions — upgrade for unlimited.`); return; }
     const buyin = parseFloat(buyIn.value);
     const cashout = parseFloat(cashIn.value);
     if (!dateIn.value || !(buyin >= 0) || !(cashout >= 0)) { nav.toast('Fill in date, buy-in and cash-out'); return; }
-    list = addSessionLog({
-      date: dateIn.value, game: gameIn.value.trim(), buyin, cashout,
+    const main = currencyCode();
+    let entry = {
+      date: dateIn.value, game: gameIn.value.trim(),
       hours: parseFloat(hoursIn.value) || 0, notes: notesIn.value.trim(),
-    });
+      currency: main,
+    };
+    if (entryCur === main) {
+      entry.buyin = buyin;
+      entry.cashout = cashout;
+    } else {
+      addBtn.disabled = true;
+      try {
+        const { convert } = await import('./fxrates.js');
+        const b = await convert(buyin, entryCur, main);
+        const c = await convert(cashout, entryCur, main);
+        entry.buyin = b.amount;
+        entry.cashout = c.amount;
+        entry.origCurrency = entryCur;
+        entry.origBuyin = buyin;
+        entry.origCashout = cashout;
+        entry.fxRate = b.rate;
+        entry.fxAt = new Date().toISOString();
+      } catch (e) {
+        addBtn.disabled = false;
+        nav.toast('Could not fetch a conversion rate — check your connection and try again.');
+        return;
+      }
+      addBtn.disabled = false;
+    }
+    list = addSessionLog(entry);
     [gameIn, buyIn, cashIn, hoursIn, notesIn].forEach((el) => (el.value = ''));
     fx.haptic(12);
     redraw();
   };
+  addBtn.onclick = add;
   redraw();
 
   return [
@@ -1172,11 +1259,16 @@ export function viewSessions() {
       h('h2', {}, 'Log a session'),
       h('label', {}, 'Date'), dateIn,
       h('label', {}, 'Game / stakes'), gameIn,
+      h('label', {}, 'Currency'), curBtn,
       h('label', {}, 'Buy-in'), buyIn,
       h('label', {}, 'Cash-out'), cashIn,
       h('label', {}, 'Hours'), hoursIn,
       h('label', {}, 'Notes'), notesIn,
-      h('button', { class: 'primary wide', html: fx.icon('plus') + 'Add session', onclick: add }),
+      atCap
+        ? h('div', { class: 'banner info cap-notice' },
+            `Free plan logs up to ${FREE_SESSION_LOG_CAP} sessions. `,
+            h('button', { class: 'sm ghost', onclick: () => nav.go('account') }, 'See Pro plans'))
+        : addBtn,
     ),
     h('div', { class: 'card' }, h('h2', {}, 'Totals'), totals),
     h('div', { class: 'card' }, h('h2', {}, 'History'), logWrap),
@@ -1884,21 +1976,57 @@ function hubBody(fn) {
   return nodes.slice(1, -1);
 }
 
+// Same lazy-resolve-then-react pattern as the Admin tile's _isOwner (see
+// viewHome): entitlements.js's own refresh() may still be in flight the
+// first time this is asked, so start locked (never flash Pro content to a
+// free user) and re-render once the real answer lands.
+function isProCached() {
+  if (!syncConfigured()) return false;
+  if (nav.state._isPro === undefined) {
+    nav.state._isPro = false;
+    import('./entitlements.js').then((ent) => {
+      const apply = () => {
+        const was = nav.state._isPro;
+        nav.state._isPro = ent.isPro();
+        if (nav.state._isPro !== was) nav.render();
+      };
+      apply();
+      ent.onEntitlementChange(apply);
+    });
+  }
+  return nav.state._isPro;
+}
+
+function lockedTabBody(label) {
+  return [
+    h('div', { class: 'card lock-card' },
+      h('div', { class: 'lock-icon' }, fx.icon('lock')),
+      h('h2', {}, label + ' is a Pro feature'),
+      h('p', { class: 'muted' }, 'Unlock this and the rest of Poker Night Pro.'),
+      h('button', { class: 'primary wide', onclick: () => nav.go('account') }, 'See Pro plans'),
+    ),
+  ];
+}
+
 function hubView(title, tabs, stateKey) {
   const tab = nav.state[stateKey] || (nav.state[stateKey] = tabs[0][0]);
+  const pro = isProCached();
   const seg = h('div', { class: 'seg seg-4' },
-    ...tabs.map(([key, , label]) =>
+    ...tabs.map(([key, , label, locked]) =>
       h('button', { class: 'seg-btn' + (tab === key ? ' on' : ''),
-        onclick: () => { nav.state[stateKey] = key; track('tool_open', { tool: title, tab: label }); nav.render(); } }, label)));
+        onclick: () => { nav.state[stateKey] = key; track('tool_open', { tool: title, tab: label }); nav.render(); } },
+        locked && !pro ? fx.icon('lock', 'sm') + label : label)));
   const active = tabs.find(([key]) => key === tab) || tabs[0];
-  return [toolHead(title), seg, ...hubBody(active[1]), backbar()];
+  const [, renderFn, label, locked] = active;
+  const body = locked && !pro ? lockedTabBody(label) : hubBody(renderFn);
+  return [toolHead(title), seg, ...body, backbar()];
 }
 
 const CALC_TABS = [
   ['bbcalc', viewBBCalc, 'BB'],
   ['odds', viewOdds, 'Odds'],
-  ['equity', viewEquity, 'Equity'],
-  ['icm', viewICM, 'ICM'],
+  ['equity', viewEquity, 'Equity', true],
+  ['icm', viewICM, 'ICM', true],
 ];
 export function viewCalculators() {
   return hubView('Calculators', CALC_TABS, 'calcTab');
@@ -1907,8 +2035,8 @@ export function viewCalculators() {
 const STUDY_TABS = [
   ['ranges', viewRanges, 'Charts'],
   ['action', viewAction, 'Advisor'],
-  ['quiz', viewQuiz, 'Quiz'],
-  ['study', viewStudy, 'Theory'],
+  ['quiz', viewQuiz, 'Quiz', true],
+  ['study', viewStudy, 'Theory', true],
 ];
 export function viewStudyHub() {
   return hubView('Study', STUDY_TABS, 'studyTab');

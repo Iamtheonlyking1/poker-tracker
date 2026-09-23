@@ -796,7 +796,7 @@ function viewJoin() {
       const full = /FREE_LIMIT live_seats/.test(msg);
       const notFound = /no live game|not found/i.test(msg);
       status.textContent = full
-        ? 'This table is full — 8 seats on the free plan.'
+        ? 'This table is full — 6 seats on the free plan.'
         : notFound
           ? 'That code didn’t match a live game. Check it and try again.'
           : 'Could not join — check your connection.';

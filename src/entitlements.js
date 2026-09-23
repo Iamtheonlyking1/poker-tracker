@@ -8,7 +8,7 @@ import { report } from './report.js';
 export const FREE_LIMITS = {
   synced_sessions: 10,
   live_games: 1,
-  live_seats: 8,
+  live_seats: 6,
   hand_log: 25,
 };
 

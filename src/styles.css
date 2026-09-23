@@ -1688,6 +1688,11 @@ label.check input {
 .sess-table tr:last-child td {
   border-bottom: 0;
 }
+.sess-table td:last-child {
+  display: flex;
+  gap: 2px;
+  white-space: nowrap;
+}
 .rt-key {
   color: var(--gold);
   font-weight: 700;
@@ -1993,6 +1998,32 @@ canvas.chart {
 }
 .cap-notice {
   font-size: 0.86rem;
+}
+.lock-card {
+  text-align: center;
+  border-color: var(--gold-deep);
+  padding: 28px 20px;
+}
+.lock-icon {
+  width: 44px;
+  height: 44px;
+  margin: 0 auto 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--gold-glow);
+  color: var(--gold);
+}
+.lock-icon .ic {
+  width: 22px;
+  height: 22px;
+}
+.seg-btn .ic.sm {
+  width: 13px;
+  height: 13px;
+  vertical-align: -1px;
+  margin-right: 3px;
 }
 .code-fallback {
   border: 1px solid var(--border);

@@ -62,6 +62,8 @@ const P = {
   cloud:
     '<path d="M7 18a4 4 0 0 1 0-8 5.5 5.5 0 0 1 10.6-1.5A3.75 3.75 0 0 1 18 18z"/>',
   logout: '<path d="M15 12H3"/><path d="M8 7l-5 5 5 5"/><path d="M14 4h6v16h-6"/>',
+  lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+  currency: '<circle cx="12" cy="12" r="9"/><path d="M12 7v10"/><path d="M15 9.3c0-1.3-1.4-2.3-3-2.3s-3 .9-3 2.2c0 2.8 6 1.3 6 4.1 0 1.3-1.4 2.2-3 2.2s-3-.9-3-2.2"/>',
 };
 
 export function icon(name, cls = '') {

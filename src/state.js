@@ -317,6 +317,21 @@ export function deleteSessionLog(id) {
   return tombstone(SESSIONLOG_KEY, id);
 }
 
+/** Patch an existing session-log entry in place (e.g. re-deriving its
+ * amounts after a currency change). No-op if the id isn't found/deleted. */
+export function updateSessionLog(id, patch) {
+  const list = readJSON(SESSIONLOG_KEY, []);
+  let hit = false;
+  for (const r of list) {
+    if (r && r.id === id && !r.deletedAt) {
+      Object.assign(r, patch, { updatedAt: Date.now() });
+      hit = true;
+    }
+  }
+  if (hit) writeJSON(SESSIONLOG_KEY, list);
+  return list.filter(notDeleted);
+}
+
 export function loadQuizScore() {
   migrate('ptk_quiz', QUIZ_KEY);
   return readJSON(QUIZ_KEY, { correct: 0, total: 0, wrong: 0, streak: 0 });
