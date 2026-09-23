@@ -32,6 +32,7 @@ import { setSoundEnabled, chip as soundChip } from './sound.js';
 import { installBanner, installGuideNodes } from './install.js';
 import { syncConfigured } from './config.js';
 import { syncPill } from './sync-ui.js';
+import { getRaw, setRaw } from './store.js';
 
 // ---------- controller hook (set once by app.js to avoid a circular import) ----------
 
@@ -220,6 +221,24 @@ function slug(s) {
 
 // ---------- Home hub ----------
 
+// Marketing banner at the top of Home — dismiss once, gone for good on this
+// device. Same pattern as install.js's snooze, minus the reshow timer: once
+// you've seen it, there's no point nagging again.
+const HERO_DISMISS_KEY = 'poker.hero.dismissed';
+
+function heroBanner() {
+  if (getRaw(HERO_DISMISS_KEY)) return null;
+  return h('div', { class: 'hero-banner' },
+    h('span', { class: 'hero-badge', html: fx.icon('crown') }),
+    h('div', { class: 'hero-text' },
+      h('div', { class: 'hero-title' }, "India's first poker study & tracking platform"),
+      h('div', { class: 'hero-sub' }, 'Built for all your tracking and study needs.'),
+    ),
+    h('button', { class: 'hero-x', 'aria-label': 'Dismiss', html: fx.icon('close'),
+      onclick: (e) => { setRaw(HERO_DISMISS_KEY, '1'); e.currentTarget.closest('.hero-banner').remove(); } }),
+  );
+}
+
 const TILES = [
   ['roster', 'users', 'Players', 'Saved regulars & notes'],
   ['studyhub', 'book', 'Study', 'Charts, advisor, quiz, theory'],
@@ -261,6 +280,7 @@ export function viewHome() {
       syncConfigured() ? syncPill(nav.syncStatus) : null,
     ),
     h('p', { class: 'muted' }, 'Run the game. Sharpen the game.'),
+    heroBanner(),
     banner,
     h('div', { class: 'card cta' },
       h('div', { class: 'cta-row' },
