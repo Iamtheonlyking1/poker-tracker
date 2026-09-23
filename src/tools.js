@@ -237,8 +237,16 @@ export function viewHome() {
   if (syncConfigured() && nav.state._isOwner === undefined) {
     nav.state._isOwner = null; // pending — don't re-trigger every render
     import('./entitlements.js').then((ent) => {
-      nav.state._isOwner = ent.isOwner();
-      if (nav.state._isOwner && nav.state.view === 'home') nav.render();
+      // entitlements.js's own refresh (kicked off by sync-boot on sign-in) may
+      // still be in flight — reading ent.isOwner() right away can catch the
+      // stale pre-refresh cache and lock in "not owner" forever. Apply now
+      // (covers the case it already resolved) AND on the next change.
+      const apply = () => {
+        nav.state._isOwner = ent.isOwner();
+        if (nav.state._isOwner && nav.state.view === 'home') nav.render();
+      };
+      apply();
+      ent.onEntitlementChange(apply);
     });
   }
   const tiles = [
