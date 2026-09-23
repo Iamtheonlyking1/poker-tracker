@@ -2000,7 +2000,7 @@ function isProCached() {
 function lockedTabBody(label) {
   return [
     h('div', { class: 'card lock-card' },
-      h('div', { class: 'lock-icon' }, fx.icon('lock')),
+      h('div', { class: 'lock-icon', html: fx.icon('lock') }),
       h('h2', {}, label + ' is a Pro feature'),
       h('p', { class: 'muted' }, 'Unlock this and the rest of Poker Night Pro.'),
       h('button', { class: 'primary wide', onclick: () => nav.go('account') }, 'See Pro plans'),
@@ -2014,8 +2014,8 @@ function hubView(title, tabs, stateKey) {
   const seg = h('div', { class: 'seg seg-4' },
     ...tabs.map(([key, , label, locked]) =>
       h('button', { class: 'seg-btn' + (tab === key ? ' on' : ''),
-        onclick: () => { nav.state[stateKey] = key; track('tool_open', { tool: title, tab: label }); nav.render(); } },
-        locked && !pro ? fx.icon('lock', 'sm') + label : label)));
+        html: locked && !pro ? fx.icon('lock', 'sm') + label : label,
+        onclick: () => { nav.state[stateKey] = key; track('tool_open', { tool: title, tab: label }); nav.render(); } })));
   const active = tabs.find(([key]) => key === tab) || tabs[0];
   const [, renderFn, label, locked] = active;
   const body = locked && !pro ? lockedTabBody(label) : hubBody(renderFn);
