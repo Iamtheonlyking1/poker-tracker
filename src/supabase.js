@@ -191,12 +191,6 @@ export const auth = {
     return storeTokenResponse(data);
   },
 
-  /** Redirect to an OAuth provider ('google' | 'apple'). Returns via the hash. */
-  signInWithOAuth(provider) {
-    const redirect = encodeURIComponent(appUrl());
-    location.href = `${getSupabaseUrl()}/auth/v1/authorize?provider=${provider}&redirect_to=${redirect}`;
-  },
-
   async refreshUser() {
     if (!session || !session.access_token) return null;
     const user = await req('/auth/v1/user');

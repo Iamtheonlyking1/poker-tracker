@@ -1639,11 +1639,6 @@ export function viewData() {
 
 // ---------- Account (sign in + sync) ----------
 
-const inStandalone = () =>
-  typeof window !== 'undefined' &&
-  ((window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
-    window.navigator.standalone === true);
-
 function authErr(e) {
   const m = String((e && (e.detail || e.message)) || e);
   if (/already registered|already exists|user_already_exists/i.test(m)) return 'That email already has an account — tap Sign in instead.';
@@ -1656,17 +1651,6 @@ function authErr(e) {
   if (/invalid|expired|token/i.test(m)) return 'That code or password wasn’t right.';
   if (/Failed to fetch|NetworkError/i.test(m)) return 'Can’t reach the server — check your connection.';
   return `Something went wrong: ${m.slice(0, 120)}`;
-}
-
-function oauthRow(sb) {
-  if (inStandalone()) return null; // OAuth redirects escape an installed PWA
-  // this is a full-page redirect, so only the attempt is observable here —
-  // there's no return-path callback to report success/failure from
-  const go = (provider) => { track('signin_method', { method: 'oauth', outcome: 'attempt', via: provider }); sb.auth.signInWithOAuth(provider); };
-  return h('div', { class: 'btn-row' },
-    h('button', { class: 'ghost', html: 'Continue with Google', onclick: () => go('google') }),
-    h('button', { class: 'ghost', html: 'Continue with Apple', onclick: () => go('apple') }),
-  );
 }
 
 export function viewAccount() {
@@ -1714,7 +1698,7 @@ export function viewAccount() {
 }
 
 function paintAccount(root, sb, au, boot, ent, up) {
-  const st = nav.state.acct || (nav.state.acct = { step: 'password', email: '', busy: false, err: '', otpSentAt: 0 });
+  const st = nav.state.acct || (nav.state.acct = { step: 'password', email: '', busy: false, err: '', otpSentAt: 0, otpMode: 'link' });
   const redraw = () => paintAccount(root, sb, au, boot, ent, up);
   const fail = (e) => {
     st.err = authErr(e);
@@ -1891,11 +1875,16 @@ function paintAccount(root, sb, au, boot, ent, up) {
         h('button', { class: 'primary', disabled: st.busy ? 'true' : null, html: 'Sign in', onclick: () => go(false) }),
         h('button', { class: 'ghost', disabled: st.busy ? 'true' : null, html: 'Create account', onclick: () => go(true) }),
       ),
-      h('button', { class: 'ghost wide', html: 'Email me a code instead', onclick: () => { st.step = 'email'; st.err = ''; redraw(); } }),
-      oauthRow(sb),
+      h('div', { class: 'btn-row' },
+        h('button', { class: 'ghost', html: 'Email me a magic link',
+          onclick: () => { st.otpMode = 'link'; st.step = 'email'; st.err = ''; redraw(); } }),
+        h('button', { class: 'ghost', html: 'Email me a one-time code',
+          onclick: () => { st.otpMode = 'code'; st.step = 'email'; st.err = ''; redraw(); } }),
+      ),
     );
   } else if (st.step === 'email') {
     const cooldownLeft = st.otpSentAt ? Math.max(0, 60 - Math.floor((Date.now() - st.otpSentAt) / 1000)) : 0;
+    const wantsCode = st.otpMode === 'code';
     const send = async () => {
       const email = emailIn.value.trim();
       if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return fail(new Error('invalid email'));
@@ -1919,14 +1908,19 @@ function paintAccount(root, sb, au, boot, ent, up) {
       h('button', {
         class: 'primary wide',
         disabled: st.busy || cooldownLeft > 0 ? 'true' : null,
-        html: st.busy ? 'Sending…' : cooldownLeft > 0 ? `Resend in ${cooldownLeft}s` : st.otpSentAt ? 'Resend code' : 'Email me a code',
+        html: st.busy ? 'Sending…' : cooldownLeft > 0 ? `Resend in ${cooldownLeft}s`
+          : st.otpSentAt ? (wantsCode ? 'Resend code' : 'Resend link')
+          : (wantsCode ? 'Email me a code' : 'Email me a link'),
         onclick: send,
       }),
+      h('button', { class: 'ghost wide',
+        html: wantsCode ? 'Send a magic link instead' : 'Send a one-time code instead',
+        onclick: () => { st.otpMode = wantsCode ? 'link' : 'code'; redraw(); } }),
       h('button', { class: 'ghost wide', html: 'Use a password instead', onclick: () => { st.step = 'password'; st.err = ''; redraw(); } }),
-      oauthRow(sb),
     );
   } else if (st.step === 'code') {
     const cooldownLeft = st.otpSentAt ? Math.max(0, 60 - Math.floor((Date.now() - st.otpSentAt) / 1000)) : 0;
+    const wantsCode = st.otpMode === 'code';
     const verify = async () => {
       const c = codeIn.value.trim();
       if (!c) return;
@@ -1957,16 +1951,26 @@ function paintAccount(root, sb, au, boot, ent, up) {
     };
     if (cooldownLeft > 0) st._cooldownTimer = setTimeout(redraw, 1000);
     codeIn.addEventListener('keydown', (e) => e.key === 'Enter' && verify());
+    // Same email either way (it carries both a link and a code) — which one's
+    // front-and-center just matches what the visitor actually asked for.
     nodes.push(
       h('div', { class: 'card' },
         h('div', { class: 'pname sm', html: fx.icon('check') + 'Check your email' }),
-        h('p', { class: 'muted small' }, `Sent to ${escapeAttr(st.email)}. Open it on this device and tap the sign-in link — you’ll come straight back here, signed in.`),
+        h('p', { class: 'muted small' },
+          wantsCode
+            ? `Sent to ${escapeAttr(st.email)}. Enter the 6-digit code below.`
+            : `Sent to ${escapeAttr(st.email)}. Open it on this device and tap the sign-in link — you’ll come straight back here, signed in.`),
       ),
-      h('details', { class: 'code-fallback' },
-        h('summary', {}, 'Got a code instead of a link?'),
-        codeIn,
-        h('button', { class: 'primary wide', disabled: st.busy ? 'true' : null, html: st.busy ? 'Checking…' : 'Verify code', onclick: verify }),
-      ),
+      wantsCode
+        ? h('div', {},
+            codeIn,
+            h('button', { class: 'primary wide', disabled: st.busy ? 'true' : null, html: st.busy ? 'Checking…' : 'Verify code', onclick: verify }),
+          )
+        : h('details', { class: 'code-fallback' },
+            h('summary', {}, 'Got a code instead of a link?'),
+            codeIn,
+            h('button', { class: 'primary wide', disabled: st.busy ? 'true' : null, html: st.busy ? 'Checking…' : 'Verify code', onclick: verify }),
+          ),
       h('button', {
         class: 'ghost wide',
         disabled: st.busy || cooldownLeft > 0 ? 'true' : null,
