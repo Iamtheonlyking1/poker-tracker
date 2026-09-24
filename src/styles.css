@@ -2020,6 +2020,53 @@ canvas.chart {
 .cap-notice {
   font-size: 0.86rem;
 }
+.plan-compare {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.84rem;
+}
+.plan-compare th {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 8px 9px;
+  border-bottom: 1px solid var(--border);
+  text-align: center;
+}
+.plan-compare th:first-child {
+  text-align: left;
+}
+.plan-compare td {
+  padding: 9px 9px;
+  border-bottom: 1px solid var(--border-soft);
+  text-align: center;
+  vertical-align: middle;
+}
+.plan-compare tr:last-child td {
+  border-bottom: 0;
+}
+.pc-feat {
+  text-align: left;
+  color: var(--text);
+}
+.cmp-yes,
+.cmp-no {
+  display: inline-flex;
+}
+.cmp-yes {
+  color: var(--gold);
+}
+.cmp-no {
+  color: var(--muted);
+  opacity: 0.5;
+}
+.cmp-text {
+  color: var(--muted);
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
 .lock-card {
   text-align: center;
   border-color: var(--gold-deep);

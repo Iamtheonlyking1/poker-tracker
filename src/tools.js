@@ -2024,6 +2024,7 @@ function paintPricing(root, sb, ent, up) {
     !signedIn
       ? h('button', { class: 'ghost wide', html: 'Sign in to subscribe', onclick: () => nav.go('account') })
       : null,
+    up.planCompare(),
   ];
   root.replaceChildren(...nodes.filter(Boolean));
 }

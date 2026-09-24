@@ -105,3 +105,40 @@ export function proCard(state = {}) {
 export function capNotice(text) {
   return h('div', { class: 'banner info cap-notice', html: fx.icon('cloud') + text });
 }
+
+// [label, free, pro] — true/false render as a tick/cross, a string renders
+// as-is (for capped features where a bare tick would lose the actual number).
+// Keep this list honest to what's actually shipped — the one exception is
+// the last row, which is real Pro-roadmap copy already promised on the
+// upgrade card above, marked "Coming soon" rather than a tick since it
+// isn't built yet.
+const FEATURE_ROWS = [
+  ['Local play, fully offline', true, true],
+  ['Cloud sync history', 'Last 10 games', 'Unlimited'],
+  ['Live shared tables at once', '1', 'Unlimited'],
+  ['Seats per live table', '6', 'Unlimited'],
+  ['Study — charts & advisor', true, true],
+  ['Study — quiz & theory', false, true],
+  ['Calculators — BB & odds', true, true],
+  ['Calculators — equity & ICM', false, true],
+  ['My Sessions log', '10 entries', 'Unlimited'],
+  ['Hand logging, leagues, AI review', false, 'Coming soon'],
+];
+
+function cmpCell(v) {
+  if (v === true) return h('span', { class: 'cmp-yes', html: fx.icon('check'), 'aria-label': 'Included' });
+  if (v === false) return h('span', { class: 'cmp-no', html: fx.icon('close'), 'aria-label': 'Not included' });
+  return h('span', { class: 'cmp-text' }, v);
+}
+
+export function planCompare() {
+  const t = h('table', { class: 'plan-compare' });
+  t.append(h('tr', {}, h('th', {}, 'Feature'), h('th', {}, 'Free'), h('th', {}, 'Pro')));
+  FEATURE_ROWS.forEach(([label, free, pro]) => {
+    t.append(h('tr', {}, h('td', { class: 'pc-feat' }, label), h('td', {}, cmpCell(free)), h('td', {}, cmpCell(pro))));
+  });
+  return h('div', { class: 'card' },
+    h('h2', {}, 'Free vs Pro'),
+    h('div', { class: 'scroll-x' }, t),
+  );
+}
