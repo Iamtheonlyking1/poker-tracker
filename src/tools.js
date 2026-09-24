@@ -3,6 +3,7 @@
 
 import { h, avatar, nameAdder } from './ui.js';
 import { track } from './analytics.js';
+import * as report from './report.js';
 import * as fx from './fx.js';
 import { fmtMoney, currencySymbol, currencyCode, allCurrencies, currencyName, setCurrency } from './money.js';
 import * as poker from './poker.js';
@@ -1689,7 +1690,10 @@ export function viewAccount() {
         ent.refresh().then(() => paintAccount(root, sb, au, boot, ent, up));
       }
     })
-    .catch(() => root.replaceChildren(h('p', { class: 'muted' }, 'Sign-in isn’t available right now.')));
+    .catch((e) => {
+      report.report(e, { kind: 'account.load' });
+      root.replaceChildren(h('p', { class: 'muted' }, 'Sign-in isn’t available right now.'));
+    });
   return [toolHead('Account'), root, backbar()];
 }
 
@@ -1947,7 +1951,10 @@ export function viewPricing() {
           .then(() => paintPricing(root, sb, ent, up));
       });
     })
-    .catch(() => root.replaceChildren(h('p', { class: 'muted' }, 'Pricing isn’t available right now.')));
+    .catch((e) => {
+      report.report(e, { kind: 'pricing.load' });
+      root.replaceChildren(h('p', { class: 'muted' }, 'Pricing isn’t available right now.'));
+    });
   return [toolHead('Pricing'), root, backbar()];
 }
 
