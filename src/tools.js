@@ -271,6 +271,7 @@ export function viewHome() {
   }
   const tiles = [
     ...(syncConfigured() ? [['account', 'user', 'Account', 'Sign in · sync your games']] : []),
+    ...(syncConfigured() ? [['pricing', 'crown', 'Pricing', 'Plans, features & upgrade']] : []),
     ...TILES,
     ...(nav.state._isOwner ? [['admin', 'graph', 'Admin', 'Usage, revenue, errors']] : []),
   ];
@@ -1682,33 +1683,10 @@ export function viewAccount() {
       // restart a chain of its own. NOT inside paintAccount either, which
       // redraw() calls on every interaction; chaining refresh().then(redraw)
       // there would restart itself forever regardless of navigation.
+      // pricing/upgrade lives on its own "Pricing" tile now (viewPricing) —
+      // Account just needs the plan badge + sync-limit copy, both off ent.refresh()
       if (sb.isSignedIn() && nav.freshNav) {
-        ent.refresh().then(() => {
-          paintAccount(root, sb, au, boot, ent, up);
-          // the launch offer's state comes from the server — ask once per
-          // visit, and only when there's an upgrade card to price
-          if (ent.isPro()) return;
-          track('upgrade_view');
-          const bill = nav.state.billing || (nav.state.billing = { busy: false, err: '' });
-          bill.quote = null;
-          import('./billing.js')
-            .then((b) => b.getQuote())
-            .then((q) => { bill.quote = q; })
-            // couldn't ask: show list prices; checkout still charges the real amount
-            .catch(() => { bill.quote = { launchActive: false, launchEndsAt: null }; })
-            .then(() => paintAccount(root, sb, au, boot, ent, up));
-        });
-      } else if (!sb.isSignedIn() && nav.freshNav) {
-        // pricing should be visible before anyone creates an account —
-        // get-quote needs no auth, so this works for a first-time visitor too
-        track('upgrade_view', { via: 'signed_out' });
-        const bill = nav.state.billing || (nav.state.billing = { busy: false, err: '' });
-        bill.quote = null;
-        import('./billing.js')
-          .then((b) => b.getQuote())
-          .then((q) => { bill.quote = q; })
-          .catch(() => { bill.quote = { launchActive: false, launchEndsAt: null }; })
-          .then(() => paintAccount(root, sb, au, boot, ent, up));
+        ent.refresh().then(() => paintAccount(root, sb, au, boot, ent, up));
       }
     })
     .catch(() => root.replaceChildren(h('p', { class: 'muted' }, 'Sign-in isn’t available right now.')));
@@ -1732,62 +1710,9 @@ function paintAccount(root, sb, au, boot, ent, up) {
   if (sb.isSignedIn()) {
     const u = sb.currentUser() || {};
     const pro = ent.isPro();
-    const bill = nav.state.billing || (nav.state.billing = { busy: false, err: '' });
 
-    const onUpgrade = async (term) => {
-      bill.busy = true;
-      bill.err = '';
-      redraw();
-      track('upgrade_checkout_open', { term });
-      try {
-        const { startCheckout } = await import('./billing.js');
-        const res = await startCheckout(term);
-        bill.busy = false;
-        if (res.completed) {
-          track('upgrade_checkout_result', { term, outcome: 'paid' });
-          nav.toast('Payment received — confirming…');
-          // the webhook usually lands within a couple of seconds; poll a few times
-          for (const delay of [1500, 3000, 5000, 8000]) {
-            await new Promise((r) => setTimeout(r, delay));
-            await ent.refresh();
-            if (ent.isPro()) break;
-          }
-          if (!ent.isPro()) bill.err = 'Payment went through — plan should update within a minute. Reopen this screen if it doesn’t.';
-        } else {
-          track('upgrade_checkout_result', { term, outcome: 'dismissed' });
-        }
-        redraw();
-      } catch (e) {
-        bill.busy = false;
-        bill.err = (e && e.message) || 'Checkout failed.';
-        track('upgrade_checkout_result', { term, outcome: 'error' });
-        redraw();
-      }
-    };
-
-    const onManage = async () => {
-      if (!confirm('Cancel Pro? You keep access until the end of the current billing period.')) return;
-      bill.busy = true;
-      bill.err = '';
-      redraw();
-      try {
-        const { cancelSubscription } = await import('./billing.js');
-        const res = await cancelSubscription();
-        bill.busy = false;
-        nav.toast(res.endsAt
-          ? `Cancelled — Pro stays active until ${new Date(res.endsAt).toLocaleDateString('en-IN', { dateStyle: 'medium' })}`
-          : 'Cancelled');
-        redraw();
-      } catch (e) {
-        bill.busy = false;
-        bill.err = (e && e.message) || 'Could not cancel.';
-        redraw();
-      }
-    };
-
-    const entRow = ent.current();
-    const canManage = pro && entRow.provider === 'razorpay' && entRow.provider_subscription_id;
-
+    // Plans, upgrade, and cancel all live on the Pricing tile now — Account
+    // stays focused on identity/sync/backup so it isn't the everything-screen.
     const nodes = [
       h('div', { class: 'card' },
         h('div', { class: 'row' },
@@ -1799,16 +1724,9 @@ function paintAccount(root, sb, au, boot, ent, up) {
             ? 'Everything synced across your devices'
             : `Your last ${ent.limit('synced_sessions')} games sync across devices`),
         h('div', { class: 'pmeta', html: fx.icon('cloud') + syncWord(boot.syncStatus()) }),
+        h('button', { class: 'ghost wide', html: fx.icon('crown') + (pro ? 'Manage subscription' : 'See pricing & upgrade'),
+          onclick: () => nav.go('pricing') }),
       ),
-      up.proCard({
-        busy: bill.busy,
-        err: bill.err,
-        quote: bill.quote || null,
-        term: bill.term,
-        onPickTerm: (t) => { bill.term = t; track('upgrade_pick_term', { term: t }); redraw(); },
-        onUpgrade: pro ? null : onUpgrade,
-        onManage: canManage ? onManage : null,
-      }),
     ];
     if (nav.state.acctChoice) {
       nodes.push(h('div', { class: 'card' },
@@ -1858,11 +1776,9 @@ function paintAccount(root, sb, au, boot, ent, up) {
   const codeIn = h('input', { type: 'text', inputmode: 'numeric', autocomplete: 'one-time-code', maxlength: '6', placeholder: '6-digit code', enterkeyhint: 'go' });
   const pwIn = h('input', { type: 'password', autocomplete: 'current-password', placeholder: 'Password', enterkeyhint: 'go' });
 
-  const bill = nav.state.billing || (nav.state.billing = { busy: false, err: '' });
   const nodes = [
     h('p', { class: 'muted' }, 'Sign in to sync your games across devices. It’s free.'),
-    up.proCard({ quote: bill.quote || null, term: bill.term, onPickTerm: (t) => { bill.term = t; redraw(); } }),
-    h('p', { class: 'muted small' }, 'Sign in below to subscribe.'),
+    h('button', { class: 'ghost wide', html: fx.icon('crown') + 'See pricing & Pro features', onclick: () => nav.go('pricing') }),
     st.err ? h('div', { class: 'banner warn' }, st.err) : null,
   ];
 
@@ -1999,6 +1915,116 @@ function paintAccount(root, sb, au, boot, ent, up) {
       h('button', { class: 'ghost wide', html: 'Use a password instead', onclick: () => { st.step = 'password'; st.err = ''; redraw(); } }),
     );
   }
+  root.replaceChildren(...nodes.filter(Boolean));
+}
+
+// ---------- Pricing / upgrade ----------
+// Its own tile, separate from Account, so "what does Pro cost and what do I
+// get" isn't buried inside the sign-in/sync screen. Signed-out visitors see
+// the same pricing (get-quote needs no auth) with a nudge to sign in before
+// checkout; a signed-in free user gets the real Upgrade button; a Pro user
+// gets their plan/renewal + Cancel — proCard already knows which to render.
+
+export function viewPricing() {
+  const root = h('div', { class: 'account-body' }, h('p', { class: 'muted' }, 'Loading…'));
+  Promise.all([import('./supabase.js'), import('./entitlements.js'), import('./upsell.js')])
+    .then(([sb, ent, up]) => {
+      paintPricing(root, sb, ent, up);
+      if (!nav.freshNav) return;
+      const afterEnt = sb.isSignedIn() ? ent.refresh() : Promise.resolve();
+      afterEnt.then(() => {
+        paintPricing(root, sb, ent, up);
+        // Pro already knows its own price from entitlements — no quote needed
+        if (sb.isSignedIn() && ent.isPro()) return;
+        track('upgrade_view', { via: sb.isSignedIn() ? 'account' : 'signed_out' });
+        const bill = nav.state.billing || (nav.state.billing = { busy: false, err: '' });
+        bill.quote = null;
+        import('./billing.js')
+          .then((b) => b.getQuote())
+          .then((q) => { bill.quote = q; })
+          // couldn't ask: show list prices; checkout still charges the real amount
+          .catch(() => { bill.quote = { launchActive: false, launchEndsAt: null }; })
+          .then(() => paintPricing(root, sb, ent, up));
+      });
+    })
+    .catch(() => root.replaceChildren(h('p', { class: 'muted' }, 'Pricing isn’t available right now.')));
+  return [toolHead('Pricing'), root, backbar()];
+}
+
+function paintPricing(root, sb, ent, up) {
+  const redraw = () => paintPricing(root, sb, ent, up);
+  const bill = nav.state.billing || (nav.state.billing = { busy: false, err: '' });
+  const signedIn = sb.isSignedIn();
+  const pro = signedIn && ent.isPro();
+
+  const onUpgrade = async (term) => {
+    bill.busy = true;
+    bill.err = '';
+    redraw();
+    track('upgrade_checkout_open', { term });
+    try {
+      const { startCheckout } = await import('./billing.js');
+      const res = await startCheckout(term);
+      bill.busy = false;
+      if (res.completed) {
+        track('upgrade_checkout_result', { term, outcome: 'paid' });
+        nav.toast('Payment received — confirming…');
+        // the webhook usually lands within a couple of seconds; poll a few times
+        for (const delay of [1500, 3000, 5000, 8000]) {
+          await new Promise((r) => setTimeout(r, delay));
+          await ent.refresh();
+          if (ent.isPro()) break;
+        }
+        if (!ent.isPro()) bill.err = 'Payment went through — plan should update within a minute. Reopen this screen if it doesn’t.';
+      } else {
+        track('upgrade_checkout_result', { term, outcome: 'dismissed' });
+      }
+      redraw();
+    } catch (e) {
+      bill.busy = false;
+      bill.err = (e && e.message) || 'Checkout failed.';
+      track('upgrade_checkout_result', { term, outcome: 'error' });
+      redraw();
+    }
+  };
+
+  const onManage = async () => {
+    if (!confirm('Cancel Pro? You keep access until the end of the current billing period.')) return;
+    bill.busy = true;
+    bill.err = '';
+    redraw();
+    try {
+      const { cancelSubscription } = await import('./billing.js');
+      const res = await cancelSubscription();
+      bill.busy = false;
+      nav.toast(res.endsAt
+        ? `Cancelled — Pro stays active until ${new Date(res.endsAt).toLocaleDateString('en-IN', { dateStyle: 'medium' })}`
+        : 'Cancelled');
+      redraw();
+    } catch (e) {
+      bill.busy = false;
+      bill.err = (e && e.message) || 'Could not cancel.';
+      redraw();
+    }
+  };
+
+  const entRow = signedIn ? ent.current() : {};
+  const canManage = pro && entRow.provider === 'razorpay' && entRow.provider_subscription_id;
+
+  const nodes = [
+    up.proCard({
+      busy: bill.busy,
+      err: bill.err,
+      quote: bill.quote || null,
+      term: bill.term,
+      onPickTerm: (t) => { bill.term = t; track('upgrade_pick_term', { term: t }); redraw(); },
+      onUpgrade: signedIn && !pro ? onUpgrade : null,
+      onManage: canManage ? onManage : null,
+    }),
+    !signedIn
+      ? h('button', { class: 'ghost wide', html: 'Sign in to subscribe', onclick: () => nav.go('account') })
+      : null,
+  ];
   root.replaceChildren(...nodes.filter(Boolean));
 }
 
@@ -2194,6 +2220,7 @@ export function viewAdmin() {
 export const TOOL_VIEWS = {
   home: viewHome,
   account: viewAccount,
+  pricing: viewPricing,
   roster: viewRoster,
   data: viewData,
   playerstats: () => viewPlayerStats(nav.state.statsPlayer),
