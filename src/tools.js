@@ -1122,19 +1122,6 @@ const PTYPES = [
   ['Maniac', 'VPIP 55+ · PFR 45+ · 3b 15%+', [['win', 'Call down wider'], ['gold', 'Trap AA/KK']]],
 ];
 
-function ptypeTable() {
-  const t = h('table', { class: 'ref-table' });
-  t.append(h('tr', {}, h('th', {}, 'Type'), h('th', {}, 'Stats'), h('th', {}, 'Adjust')));
-  PTYPES.forEach(([name, stats, tags]) => {
-    t.append(h('tr', {},
-      h('td', { class: 'rt-key' }, name),
-      h('td', { class: 'ptype-stats' }, stats),
-      h('td', {}, ...tags.map(([tone, label]) => h('span', { class: 'adjust-tag t-' + tone }, label))),
-    ));
-  });
-  return h('div', { class: 'scroll-x' }, t);
-}
-
 const FREE_SESSION_LOG_CAP = 10;
 
 export function viewSessions() {
@@ -1317,12 +1304,24 @@ export function viewSessions() {
       h('div', { class: 'chart-lbl' }, 'Cumulative P&L'), pnlCanvas,
       h('div', { class: 'chart-lbl' }, 'Profit per session'), barCanvas,
     ),
-    h('div', { class: 'card' }, h('h2', {}, 'Player types'), ptypeTable()),
     backbar(),
   ];
 }
 
 // ---------- Players roster ----------
+
+function ptypeTable() {
+  const t = h('table', { class: 'ref-table' });
+  t.append(h('tr', {}, h('th', {}, 'Type'), h('th', {}, 'Stats'), h('th', {}, 'Adjust')));
+  PTYPES.forEach(([name, stats, tags]) => {
+    t.append(h('tr', {},
+      h('td', { class: 'rt-key' }, name),
+      h('td', { class: 'ptype-stats' }, stats),
+      h('td', {}, ...tags.map(([tone, label]) => h('span', { class: 'adjust-tag t-' + tone }, label))),
+    ));
+  });
+  return h('div', { class: 'scroll-x' }, t);
+}
 
 function rosterLifetime(name) {
   const key = name.trim().toLowerCase();
@@ -1401,6 +1400,7 @@ export function viewRoster() {
       h('p', { class: 'muted small' }, 'Saved players show up as one-tap chips when you start a game. Notes stay on this device only.'),
     ),
     list,
+    h('div', { class: 'card' }, h('h2', {}, 'Player types'), ptypeTable()),
     backbar(),
   ];
 }
