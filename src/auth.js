@@ -2,7 +2,7 @@
 // sign-out-and-wipe behaviour (the owner's choice — a signed-out device keeps
 // nothing) and the account-deletion call.
 
-import { auth, currentUser, isSignedIn, onAuthChange } from './supabase.js';
+import { auth, currentUser, isSignedIn, onAuthChange, functions } from './supabase.js';
 import { getRaw, setRaw, keys } from './store.js';
 import { report } from './report.js';
 
@@ -51,10 +51,17 @@ function outboxSize() {
 }
 
 /**
- * Permanently delete the account. Server-side work (removing rows, cancelling a
- * subscription) runs in an Edge Function; it does not exist yet, so this throws
- * until Phase 5/8 add it. The UI should offer a data export first regardless.
+ * Permanently delete the account: server-side (delete-account Edge
+ * Function) removes every row that references this user — every table
+ * already has an ON DELETE cascade/set-null rule, so deleting the
+ * auth.users row there is the whole job — and best-effort cancels an active
+ * Razorpay subscription first. Irreversible; the caller should confirm and
+ * offer a data export before calling this. On success, also signs out and
+ * wipes this device (the account is gone; there's nothing left to be signed
+ * into) — a thrown error leaves the local session untouched.
  */
 export async function deleteAccount() {
-  throw new Error('Account deletion is not available yet — email support to close your account.');
+  await functions.invoke('delete-account', {});
+  await auth.signOut();
+  wipeLocalData();
 }

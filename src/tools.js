@@ -1770,6 +1770,26 @@ function paintAccount(root, sb, au, boot, ent, up) {
             nav.go('home');
           }
         } }),
+      h('div', { class: 'card' },
+        h('h2', {}, 'Delete account'),
+        h('p', { class: 'muted small' }, 'Permanently deletes your account and all cloud data — games, roster, live tables — and cancels any active subscription immediately. Cannot be undone. This device’s local data is untouched unless you also sign out.'),
+        h('button', { class: 'danger wide', disabled: st.acctDeleting ? 'true' : null, html: fx.icon('trash') + (st.acctDeleting ? 'Deleting…' : 'Delete account'),
+          onclick: async () => {
+            if (!confirm('Permanently delete your account and all cloud data? This cannot be undone.')) return;
+            st.acctDeleting = true;
+            redraw();
+            try {
+              await au.deleteAccount();
+              nav.state.acct = null;
+              nav.toast('Account deleted');
+              nav.go('home');
+            } catch (e) {
+              st.acctDeleting = false;
+              nav.toast((e && e.message) || 'Could not delete account.');
+              redraw();
+            }
+          } }),
+      ),
     );
     root.replaceChildren(...nodes);
     return;
