@@ -312,7 +312,22 @@ export function viewHome() {
     ),
     h('button', { class: 'ghost wide', html: fx.icon('trophy') + `Game history${hist.length ? ` (${hist.length})` : ''}`, onclick: () => nav.go('history') }),
     h('div', { class: 'home-footer' },
-      h('a', { class: 'home-footer-link', href: 'mailto:support@poker-study.com', html: fx.icon('mail') + 'Need help? support@poker-study.com' }),
+      h('a', {
+        class: 'home-footer-link', href: 'mailto:support@poker-study.com',
+        html: fx.icon('mail') + 'Need help? support@poker-study.com',
+        // Still a real mailto: link (works fine wherever the OS has a mail
+        // app registered — phones, mostly). On a desktop with no default
+        // mail client set it just opens a blank tab, so back it up with a
+        // clipboard copy either way — useful outcome regardless of the OS.
+        onclick: async () => {
+          try {
+            await navigator.clipboard.writeText('support@poker-study.com');
+            nav.toast('Email copied — support@poker-study.com');
+          } catch (err) {
+            /* clipboard unsupported/denied — the mailto: attempt is all we've got */
+          }
+        },
+      }),
     ),
   ];
 }
