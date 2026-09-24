@@ -168,10 +168,28 @@ function undo() {
   }
 }
 
+// Every navigation pushes a history entry tagged with the view name, so the
+// phone's swipe-back gesture and the browser/OS back button work exactly
+// like a real "previous screen" — not just the in-app Home button. A
+// re-render that isn't a navigation (reactive sync updates, nav.render())
+// must NOT go through here, or the back-stack fills with non-navigation noise.
 function go(view) {
+  state.view = view;
+  history.pushState({ view }, '', location.pathname + location.search + location.hash);
+  render({ nav: true });
+}
+
+// Applies a view popped off the back-stack by the browser — same as go()
+// but does NOT push a new entry (that would break forward/back entirely,
+// since every "back" would immediately re-push and go nowhere).
+function goFromHistory(view) {
   state.view = view;
   render({ nav: true });
 }
+
+window.addEventListener('popstate', (e) => {
+  goFromHistory((e.state && e.state.view) || 'home');
+});
 
 function elapsedPill(s) {
   return h('span', {
