@@ -311,6 +311,9 @@ export function viewHome() {
       ),
     ),
     h('button', { class: 'ghost wide', html: fx.icon('trophy') + `Game history${hist.length ? ` (${hist.length})` : ''}`, onclick: () => nav.go('history') }),
+    h('div', { class: 'home-footer' },
+      h('a', { class: 'home-footer-link', href: 'mailto:support@poker-study.com', html: fx.icon('mail') + 'Need help? support@poker-study.com' }),
+    ),
   ];
 }
 

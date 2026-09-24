@@ -1212,6 +1212,27 @@ label {
   gap: 10px;
   margin: 4px 0 14px;
 }
+.home-footer {
+  text-align: center;
+  margin: 18px 0 6px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-soft);
+}
+.home-footer-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  text-decoration: none;
+}
+.home-footer-link .ic {
+  width: 15px;
+  height: 15px;
+}
+.home-footer-link:hover {
+  color: var(--gold);
+}
 .tool-tile {
   min-height: 96px;
   flex-direction: column;

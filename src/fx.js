@@ -64,6 +64,7 @@ const P = {
   logout: '<path d="M15 12H3"/><path d="M8 7l-5 5 5 5"/><path d="M14 4h6v16h-6"/>',
   lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
   currency: '<circle cx="12" cy="12" r="9"/><path d="M12 7v10"/><path d="M15 9.3c0-1.3-1.4-2.3-3-2.3s-3 .9-3 2.2c0 2.8 6 1.3 6 4.1 0 1.3-1.4 2.2-3 2.2s-3-.9-3-2.2"/>',
+  mail: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>',
 };
 
 export function icon(name, cls = '') {
