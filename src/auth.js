@@ -55,7 +55,7 @@ function outboxSize() {
  * Function) removes every row that references this user — every table
  * already has an ON DELETE cascade/set-null rule, so deleting the
  * auth.users row there is the whole job — and best-effort cancels an active
- * Razorpay subscription first. Irreversible; the caller should confirm and
+ * Dodo subscription first. Irreversible; the caller should confirm and
  * offer a data export before calling this. On success, also signs out and
  * wipes this device (the account is gone; there's nothing left to be signed
  * into) — a thrown error leaves the local session untouched.

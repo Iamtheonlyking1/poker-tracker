@@ -1,24 +1,8 @@
-// Razorpay checkout, client side. The Edge Functions (create-subscription,
-// cancel-subscription, razorpay-webhook) do the actual work; this just opens
-// Razorpay's hosted checkout and calls them. No card data ever touches us.
+// Dodo Payments checkout, client side. The Edge Functions (create-subscription,
+// cancel-subscription, dodo-webhook) do the actual work; this just redirects
+// to Dodo's hosted checkout page and calls them. No card data ever touches us.
 
 import { functions, currentUser } from './supabase.js';
-
-const CHECKOUT_SCRIPT = 'https://checkout.razorpay.com/v1/checkout.js';
-let scriptLoading = null;
-
-function loadCheckoutScript() {
-  if (typeof window !== 'undefined' && window.Razorpay) return Promise.resolve();
-  if (scriptLoading) return scriptLoading;
-  scriptLoading = new Promise((resolve, reject) => {
-    const s = document.createElement('script');
-    s.src = CHECKOUT_SCRIPT;
-    s.onload = () => resolve();
-    s.onerror = () => reject(new Error('Could not load the payment form — check your connection.'));
-    document.head.appendChild(s);
-  });
-  return scriptLoading;
-}
 
 /**
  * Is the launch price still on offer? Asked of the server (it owns the clock
@@ -33,44 +17,21 @@ export async function getQuote() {
 }
 
 /**
- * Open Razorpay checkout for a Pro subscription of the given term
- * ('1m' | '3m' | '6m' | '12m'). Resolves `{ completed }`
- * once the checkout modal closes. `completed: true` means Razorpay collected
- * payment — it does NOT mean the account is Pro yet; the webhook flips the
- * entitlement, usually within a couple of seconds. The caller should poll
- * entitlements.refresh() a few times after this resolves.
+ * Start a Pro subscription checkout for the given term ('1m' | '3m' | '6m' |
+ * '12m'). Unlike the old Razorpay in-page modal, Dodo's checkout is a hosted
+ * page — this does a full-page redirect there and never returns (the browser
+ * navigates away). Dodo redirects back to the app's own URL with
+ * ?checkout=done or ?checkout=cancelled once the customer is done; app.js's
+ * boot() reads that on the fresh page load that follows and shows the
+ * "confirming…" state / polls entitlements, since there's no in-page promise
+ * to resolve the way the old modal's onDismiss/handler callbacks gave us.
  */
 export async function startCheckout(term) {
   const user = currentUser();
   if (!user) throw new Error('Sign in first.');
-  await loadCheckoutScript();
-  const { subscriptionId, keyId } = await functions.invoke('create-subscription', { term });
-
-  return new Promise((resolve, reject) => {
-    let settled = false;
-    const rzp = new window.Razorpay({
-      key: keyId,
-      subscription_id: subscriptionId,
-      name: 'Poker Night',
-      description: 'Pro — full sync history, unlimited shared tables',
-      prefill: { email: user.email || '' },
-      theme: { color: '#e7bd5c' },
-      handler: () => {
-        settled = true;
-        resolve({ completed: true });
-      },
-      modal: {
-        ondismiss: () => {
-          if (!settled) resolve({ completed: false });
-        },
-      },
-    });
-    rzp.on('payment.failed', (resp) => {
-      settled = true;
-      reject(new Error((resp && resp.error && resp.error.description) || 'Payment failed.'));
-    });
-    rzp.open();
-  });
+  const { checkoutUrl } = await functions.invoke('create-subscription', { term });
+  if (!checkoutUrl) throw new Error('Could not start checkout.');
+  location.href = checkoutUrl;
 }
 
 /** Cancel at the end of the current billing period. Returns { ok, endsAt }. */

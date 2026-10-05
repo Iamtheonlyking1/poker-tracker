@@ -4,9 +4,9 @@
 // this code runs, so the decoded `sub` claim below can be trusted.
 //
 // Secrets (this function, or the project-wide Secrets page):
-//   RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET   — to cancel an active subscription
-//     before deleting the account. Best-effort only: deletion proceeds even
-//     if this fails or the secrets aren't set.
+//   DODO_API_KEY, DODO_API_BASE   — to cancel an active subscription before
+//     deleting the account. Best-effort only: deletion proceeds even if this
+//     fails or the secrets aren't set.
 // SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY are provided automatically.
 //
 // What actually deletes the data: every table that references auth.users
@@ -21,8 +21,8 @@
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-const RAZORPAY_KEY_ID = Deno.env.get('RAZORPAY_KEY_ID');
-const RAZORPAY_KEY_SECRET = Deno.env.get('RAZORPAY_KEY_SECRET');
+const DODO_API_KEY = Deno.env.get('DODO_API_KEY');
+const DODO_API_BASE = Deno.env.get('DODO_API_BASE');
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -58,23 +58,22 @@ Deno.serve(async (req) => {
   if (!SERVICE_KEY) return json({ error: 'Account deletion is not configured yet.' }, 503);
   const svc = { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` };
 
-  // Best-effort: cancel an active Razorpay subscription first. A Razorpay
-  // hiccup here should never block someone from deleting their account.
-  if (RAZORPAY_KEY_ID && RAZORPAY_KEY_SECRET) {
+  // Best-effort: cancel an active Dodo subscription first. A Dodo hiccup
+  // here should never block someone from deleting their account.
+  if (DODO_API_KEY && DODO_API_BASE) {
     try {
       const entRes = await fetch(
         `${SUPABASE_URL}/rest/v1/entitlements?user_id=eq.${userId}&select=provider,provider_subscription_id,status`,
         { headers: svc },
       );
       const [ent] = await entRes.json().catch(() => []);
-      if (ent && ent.provider === 'razorpay' && ent.provider_subscription_id && ent.status !== 'canceled') {
-        const rzpAuth = 'Basic ' + btoa(`${RAZORPAY_KEY_ID}:${RAZORPAY_KEY_SECRET}`);
+      if (ent && ent.provider === 'dodo' && ent.provider_subscription_id && ent.status !== 'canceled') {
         // the account is being deleted, not just downgraded — cancel now,
         // not at the end of the billing period like a normal cancel would
-        await fetch(`https://api.razorpay.com/v1/subscriptions/${ent.provider_subscription_id}/cancel`, {
-          method: 'POST',
-          headers: { Authorization: rzpAuth, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ cancel_at_cycle_end: 0 }),
+        await fetch(`${DODO_API_BASE}/subscriptions/${ent.provider_subscription_id}`, {
+          method: 'PATCH',
+          headers: { Authorization: `Bearer ${DODO_API_KEY}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'cancelled', cancel_reason: 'cancelled_by_customer' }),
         });
       }
     } catch (_e) { /* best-effort — deletion proceeds regardless */ }

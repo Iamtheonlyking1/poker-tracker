@@ -1,13 +1,15 @@
 // Pro plan catalogue + price maths. Pure (no DOM) so it's unit-tested.
 //
 // The amounts here are DISPLAY ONLY. What a customer is actually charged is
-// the Razorpay plan's amount (= list) minus the launch offer, if create-
-// subscription attached one — keep them in step when prices change. Which tier
-// applies is decided by the server clock; the client just asks (billing.js).
+// the Dodo product's price (= list) minus the launch discount code, if
+// create-subscription attached one — keep them in step when prices change.
+// Which tier applies is decided by the server clock; the client just asks
+// (billing.js).
 //
 // Launch price = the first LAUNCH_PAYMENTS payments (the signup payment plus
-// ONE renewal), then the plan's full list price. LAUNCH_PAYMENTS must match the
-// "cycles" set on the Razorpay launch offers.
+// ONE renewal), then the product's full list price. LAUNCH_PAYMENTS must
+// match the launch discount codes' "Subscription Cycle Limit" in Dodo —
+// Dodo reverts to list price on its own after that many renewals.
 
 export const LAUNCH_PAYMENTS = 2;
 

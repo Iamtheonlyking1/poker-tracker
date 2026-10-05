@@ -37,7 +37,7 @@ import * as report from './report.js';
 import { runMigrations, purgeOldTombstones } from './migrate.js';
 import { initInstall } from './install.js';
 import { syncConfigured } from './config.js';
-import { isPro as entIsPro, limit as entLimit } from './entitlements.js';
+import { isPro as entIsPro, limit as entLimit, refresh as entRefresh } from './entitlements.js';
 import { isSignedIn as authedIn } from './supabase.js';
 
 // live-table controller, loaded on demand (needs a Supabase project)
@@ -1055,7 +1055,33 @@ function afterResults() {
 
 // ---------- boot ----------
 
+// Dodo's hosted checkout is a real navigation away and back — there's no
+// in-page promise to resolve the way the old Razorpay modal's close-handler
+// gave us, so the "did it work?" question gets answered here instead, on the
+// fresh page load Dodo's redirect produces.
+function handleCheckoutReturn() {
+  const checkout = new URLSearchParams(location.search).get('checkout');
+  if (!checkout) return false;
+  history.replaceState(null, '', location.pathname + location.hash);
+  if (checkout !== 'done') { go('pricing'); return true; }
+  go('pricing');
+  toast('Payment received — confirming…');
+  (async () => {
+    // the webhook usually lands within a couple of seconds; poll a few times
+    for (const delay of [1500, 3000, 5000, 8000]) {
+      await new Promise((r) => setTimeout(r, delay));
+      await entRefresh();
+      if (entIsPro()) break;
+    }
+    if (entIsPro()) toast('You’re on Pro!');
+    else toast('Payment went through — plan should update within a minute. Reopen Pricing if it doesn’t.');
+    if (state.view === 'pricing') render();
+  })();
+  return true;
+}
+
 function boot() {
+  if (handleCheckoutReturn()) return;
   const joinMatch = location.hash.match(/[#&]j=([0-9A-Za-z]{4,8})/);
   if (joinMatch && syncConfigured()) {
     state.joinCode = joinMatch[1].toUpperCase();

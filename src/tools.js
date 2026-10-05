@@ -1984,6 +1984,13 @@ function paintPricing(root, sb, ent, up) {
   const signedIn = sb.isSignedIn();
   const pro = signedIn && ent.isPro();
 
+  // Dodo's checkout is a hosted page, not an in-page modal — startCheckout()
+  // redirects the whole browser there and (on success) never returns; the
+  // page just unloads. Only a failure BEFORE that redirect (not signed in,
+  // billing misconfigured, already Pro) ever reaches the catch below. What
+  // happens after checkout — "paid" vs "dismissed", confirming the plan
+  // actually flipped — is handled on the fresh page load that follows,
+  // by app.js's boot() reading the ?checkout= param Dodo redirects back with.
   const onUpgrade = async (term) => {
     bill.busy = true;
     bill.err = '';
@@ -1991,22 +1998,7 @@ function paintPricing(root, sb, ent, up) {
     track('upgrade_checkout_open', { term });
     try {
       const { startCheckout } = await import('./billing.js');
-      const res = await startCheckout(term);
-      bill.busy = false;
-      if (res.completed) {
-        track('upgrade_checkout_result', { term, outcome: 'paid' });
-        nav.toast('Payment received — confirming…');
-        // the webhook usually lands within a couple of seconds; poll a few times
-        for (const delay of [1500, 3000, 5000, 8000]) {
-          await new Promise((r) => setTimeout(r, delay));
-          await ent.refresh();
-          if (ent.isPro()) break;
-        }
-        if (!ent.isPro()) bill.err = 'Payment went through — plan should update within a minute. Reopen this screen if it doesn’t.';
-      } else {
-        track('upgrade_checkout_result', { term, outcome: 'dismissed' });
-      }
-      redraw();
+      await startCheckout(term);
     } catch (e) {
       bill.busy = false;
       bill.err = (e && e.message) || 'Checkout failed.';
@@ -2036,7 +2028,7 @@ function paintPricing(root, sb, ent, up) {
   };
 
   const entRow = signedIn ? ent.current() : {};
-  const canManage = pro && entRow.provider === 'razorpay' && entRow.provider_subscription_id;
+  const canManage = pro && entRow.provider === 'dodo' && entRow.provider_subscription_id;
 
   const nodes = [
     up.proCard({

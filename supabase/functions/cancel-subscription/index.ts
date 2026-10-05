@@ -1,16 +1,16 @@
 // Deploy: paste as function "cancel-subscription". Leave "Enforce JWT
-// Verification" ON. Secrets: RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET (same values
-// as create-subscription).
+// Verification" ON. Secrets: DODO_API_KEY, DODO_API_BASE (same values as
+// create-subscription).
 //
 // Cancels at the end of the current billing period — the user keeps Pro until
 // then, matching the stated refund/cancellation policy. Doesn't touch
-// entitlements directly; the webhook flips plan/status when Razorpay actually
-// ends the subscription.
+// entitlements directly; dodo-webhook flips plan/status when Dodo actually
+// ends the subscription (subscription.cancelled).
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-const RAZORPAY_KEY_ID = Deno.env.get('RAZORPAY_KEY_ID');
-const RAZORPAY_KEY_SECRET = Deno.env.get('RAZORPAY_KEY_SECRET');
+const DODO_API_KEY = Deno.env.get('DODO_API_KEY');
+const DODO_API_BASE = Deno.env.get('DODO_API_BASE');
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -47,18 +47,17 @@ Deno.serve(async (req) => {
     { headers: svc },
   );
   const [ent] = await entRes.json().catch(() => []);
-  if (!ent || ent.provider !== 'razorpay' || !ent.provider_subscription_id) {
+  if (!ent || ent.provider !== 'dodo' || !ent.provider_subscription_id) {
     return json({ error: 'No active subscription to cancel.' }, 404);
   }
 
-  const rzpAuth = 'Basic ' + btoa(`${RAZORPAY_KEY_ID}:${RAZORPAY_KEY_SECRET}`);
-  const res = await fetch(`https://api.razorpay.com/v1/subscriptions/${ent.provider_subscription_id}/cancel`, {
-    method: 'POST',
-    headers: { Authorization: rzpAuth, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ cancel_at_cycle_end: 1 }),
+  const res = await fetch(`${DODO_API_BASE}/subscriptions/${ent.provider_subscription_id}`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${DODO_API_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ cancel_at_next_billing_date: true, cancel_reason: 'cancelled_by_customer' }),
   });
   const out = await res.json().catch(() => ({}));
-  if (!res.ok) return json({ error: (out.error && out.error.description) || 'Could not cancel.' }, 502);
+  if (!res.ok) return json({ error: out.message || out.error || 'Could not cancel.' }, 502);
 
-  return json({ ok: true, endsAt: out.current_end ? new Date(out.current_end * 1000).toISOString() : null });
+  return json({ ok: true, endsAt: out.next_billing_date || null });
 });

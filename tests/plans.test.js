@@ -1,13 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parsePlans, launchActive, pickPlan, listPlanFor, shouldSwitchToList, TERMS } from '../supabase/functions/_shared/plans.js';
+import { parseJsonMap, launchActive, pickPlan, TERMS } from '../supabase/functions/_shared/plans.js';
 
-const PLANS = JSON.stringify({
-  '1m': { launch: 'plan_1L', list: 'plan_1P' },
-  '3m': { launch: 'plan_3L', list: 'plan_3P' },
-  '6m': { launch: 'plan_6L', list: 'plan_6P' },
-  '12m': { launch: 'plan_12L', list: 'plan_12P' },
-});
+const PRODUCTS = JSON.stringify({ '1m': 'pdt_1m', '3m': 'pdt_3m', '6m': 'pdt_6m', '12m': 'pdt_12m' });
+const DISCOUNTS = JSON.stringify({ '1m': 'LAUNCH1M', '3m': 'LAUNCH3M', '6m': 'LAUNCH6M', '12m': 'LAUNCH12M' });
 const ENDS = '2026-12-01T00:00:00Z';
 const BEFORE = Date.parse('2026-11-30T23:59:59Z');
 const AFTER = Date.parse('2026-12-01T00:00:00Z');
@@ -20,59 +16,41 @@ test('launchActive — strictly before the end instant only', () => {
   assert.equal(launchActive(undefined, BEFORE), false);
 });
 
-test('parsePlans — null for missing/garbage, object for valid JSON', () => {
-  assert.equal(parsePlans(''), null);
-  assert.equal(parsePlans('{nope'), null);
-  assert.equal(parsePlans('7'), null);
-  assert.equal(parsePlans(PLANS)['3m'].launch, 'plan_3L');
+test('parseJsonMap — null for missing/garbage, object for valid JSON', () => {
+  assert.equal(parseJsonMap(''), null);
+  assert.equal(parseJsonMap('{nope'), null);
+  assert.equal(parseJsonMap('7'), null);
+  assert.equal(parseJsonMap(PRODUCTS)['3m'], 'pdt_3m');
 });
 
-test('pickPlan — launch window picks launch plans, after picks list plans', () => {
-  const a = pickPlan({ term: '3m', plansRaw: PLANS, launchEndsAt: ENDS, now: BEFORE });
-  assert.deepEqual([a.planId, a.tier, a.months], ['plan_3L', 'launch', 3]);
-  const b = pickPlan({ term: '3m', plansRaw: PLANS, launchEndsAt: ENDS, now: AFTER });
-  assert.deepEqual([b.planId, b.tier], ['plan_3P', 'list']);
+test('pickPlan — launch window attaches the discount code, after it does not', () => {
+  const a = pickPlan({ term: '3m', productsRaw: PRODUCTS, discountsRaw: DISCOUNTS, launchEndsAt: ENDS, now: BEFORE });
+  assert.deepEqual([a.productId, a.tier, a.discountCode, a.months], ['pdt_3m', 'launch', 'LAUNCH3M', 3]);
+  const b = pickPlan({ term: '3m', productsRaw: PRODUCTS, discountsRaw: DISCOUNTS, launchEndsAt: ENDS, now: AFTER });
+  assert.deepEqual([b.productId, b.tier, b.discountCode], ['pdt_3m', 'list', null]);
 });
 
-test('pickPlan — no LAUNCH_ENDS_AT means list price (safe default)', () => {
-  const p = pickPlan({ term: '1m', plansRaw: PLANS, launchEndsAt: undefined, now: BEFORE });
+test('pickPlan — no LAUNCH_ENDS_AT means list price (safe default), no discount code', () => {
+  const p = pickPlan({ term: '1m', productsRaw: PRODUCTS, discountsRaw: DISCOUNTS, launchEndsAt: undefined, now: BEFORE });
   assert.equal(p.tier, 'list');
+  assert.equal(p.discountCode, null);
 });
 
-test('pickPlan — total_count keeps every term at ~25 years (under both Razorpay\'s card end-date cap and UPI\'s 30-year mandate cap)', () => {
-  for (const t of Object.keys(TERMS)) {
-    const p = pickPlan({ term: t, plansRaw: PLANS, launchEndsAt: ENDS, now: BEFORE });
-    assert.equal(p.totalCount * p.months, 300);
-  }
+test('pickPlan — launch active but no discount codes configured still checks out at list price', () => {
+  const p = pickPlan({ term: '1m', productsRaw: PRODUCTS, discountsRaw: '', launchEndsAt: ENDS, now: BEFORE });
+  assert.equal(p.tier, 'list');
+  assert.equal(p.discountCode, null);
+  assert.equal(p.productId, 'pdt_1m', 'still checks out — a missing discount config should never block a sale');
 });
 
-test('pickPlan — bad term is 400, missing config is 503', () => {
-  assert.throws(() => pickPlan({ term: '2m', plansRaw: PLANS, launchEndsAt: ENDS }), (e) => e.status === 400);
-  assert.throws(() => pickPlan({ term: '__proto__', plansRaw: PLANS, launchEndsAt: ENDS }), (e) => e.status === 400);
-  assert.throws(() => pickPlan({ term: '1m', plansRaw: '', launchEndsAt: ENDS }), (e) => e.status === 503);
-  const partial = JSON.stringify({ '1m': { list: 'plan_1P' } });
-  assert.throws(() => pickPlan({ term: '1m', plansRaw: partial, launchEndsAt: ENDS, now: BEFORE }), (e) => e.status === 503,
-    'launch active but launch plan id missing must not silently charge list price');
+test('pickPlan — bad term is 400, missing product config is 503', () => {
+  assert.throws(() => pickPlan({ term: '2m', productsRaw: PRODUCTS, launchEndsAt: ENDS }), (e) => e.status === 400);
+  assert.throws(() => pickPlan({ term: '__proto__', productsRaw: PRODUCTS, launchEndsAt: ENDS }), (e) => e.status === 400);
+  assert.throws(() => pickPlan({ term: '1m', productsRaw: '', launchEndsAt: ENDS }), (e) => e.status === 503);
+  const partial = JSON.stringify({ '1m': {} });
+  assert.throws(() => pickPlan({ term: '1m', productsRaw: partial, launchEndsAt: ENDS }), (e) => e.status === 503);
 });
 
-test('listPlanFor — the list-price plan id for a term, or null if missing', () => {
-  assert.equal(listPlanFor('3m', PLANS), 'plan_3P');
-  assert.equal(listPlanFor('3m', ''), null);
-  assert.equal(listPlanFor('3m', '{nope'), null);
-  assert.equal(listPlanFor('7m', PLANS), null, 'unknown term');
-  const noList = JSON.stringify({ '1m': { launch: 'plan_1L' } });
-  assert.equal(listPlanFor('1m', noList), null);
-});
-
-test('shouldSwitchToList — fires from paidCount >= LAUNCH_PAYMENTS while notes still say launch', () => {
-  assert.equal(shouldSwitchToList('launch', 1, 2), false, 'first payment — not yet');
-  assert.equal(shouldSwitchToList('launch', 2, 2), true, 'second payment — switch now');
-  assert.equal(shouldSwitchToList('launch', 3, 2), true,
-    'still true on a later charge — this is how a failed switch attempt on the 2nd payment retries on the 3rd, ' +
-    'rather than leaving the customer on the launch plan forever; it stops once the switch actually succeeds ' +
-    'and flips the subscription notes to tier: list, not by counting exactly');
-  assert.equal(shouldSwitchToList('list', 2, 2), false, 'a list-tier subscriber never switches — already switched');
-  assert.equal(shouldSwitchToList('launch', 2), true, 'defaults to the exported LAUNCH_PAYMENTS');
-  assert.equal(shouldSwitchToList('launch', undefined, 2), false, 'no paid_count on the event — nothing to compare, stay put');
-  assert.equal(shouldSwitchToList('launch', null, 2), false);
+test('every term is covered', () => {
+  assert.deepEqual(Object.keys(TERMS).sort(), ['12m', '1m', '3m', '6m']);
 });
