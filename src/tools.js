@@ -1698,7 +1698,7 @@ export function viewAccount() {
 }
 
 function paintAccount(root, sb, au, boot, ent, up) {
-  const st = nav.state.acct || (nav.state.acct = { step: 'password', email: '', busy: false, err: '', otpSentAt: 0, otpMode: 'link' });
+  const st = nav.state.acct || (nav.state.acct = { step: 'password', email: '', busy: false, err: '', otpSentAt: 0 });
   const redraw = () => paintAccount(root, sb, au, boot, ent, up);
   const fail = (e) => {
     st.err = authErr(e);
@@ -1797,7 +1797,6 @@ function paintAccount(root, sb, au, boot, ent, up) {
 
   // ---- signed out ----
   const emailIn = h('input', { type: 'email', inputmode: 'email', autocomplete: 'email', placeholder: 'you@example.com', value: st.email, enterkeyhint: 'go' });
-  const codeIn = h('input', { type: 'text', inputmode: 'numeric', autocomplete: 'one-time-code', maxlength: '6', placeholder: '6-digit code', enterkeyhint: 'go' });
   const pwIn = h('input', { type: 'password', autocomplete: 'current-password', placeholder: 'Password', enterkeyhint: 'go' });
 
   const nodes = [
@@ -1833,16 +1832,11 @@ function paintAccount(root, sb, au, boot, ent, up) {
         h('button', { class: 'primary', disabled: st.busy ? 'true' : null, html: 'Sign in', onclick: () => go(false) }),
         h('button', { class: 'ghost', disabled: st.busy ? 'true' : null, html: 'Create account', onclick: () => go(true) }),
       ),
-      h('div', { class: 'btn-row' },
-        h('button', { class: 'ghost', html: 'Email me a magic link',
-          onclick: () => { st.otpMode = 'link'; st.step = 'email'; st.err = ''; redraw(); } }),
-        h('button', { class: 'ghost', html: 'Email me a one-time code',
-          onclick: () => { st.otpMode = 'code'; st.step = 'email'; st.err = ''; redraw(); } }),
-      ),
+      h('button', { class: 'ghost wide', html: 'Email me a magic link',
+        onclick: () => { st.step = 'email'; st.err = ''; redraw(); } }),
     );
   } else if (st.step === 'email') {
     const cooldownLeft = st.otpSentAt ? Math.max(0, 60 - Math.floor((Date.now() - st.otpSentAt) / 1000)) : 0;
-    const wantsCode = st.otpMode === 'code';
     const send = async () => {
       const email = emailIn.value.trim();
       if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return fail(new Error('invalid email'));
@@ -1866,34 +1860,13 @@ function paintAccount(root, sb, au, boot, ent, up) {
       h('button', {
         class: 'primary wide',
         disabled: st.busy || cooldownLeft > 0 ? 'true' : null,
-        html: st.busy ? 'Sending…' : cooldownLeft > 0 ? `Resend in ${cooldownLeft}s`
-          : st.otpSentAt ? (wantsCode ? 'Resend code' : 'Resend link')
-          : (wantsCode ? 'Email me a code' : 'Email me a link'),
+        html: st.busy ? 'Sending…' : cooldownLeft > 0 ? `Resend in ${cooldownLeft}s` : st.otpSentAt ? 'Resend link' : 'Email me a link',
         onclick: send,
       }),
-      h('button', { class: 'ghost wide',
-        html: wantsCode ? 'Send a magic link instead' : 'Send a one-time code instead',
-        onclick: () => { st.otpMode = wantsCode ? 'link' : 'code'; redraw(); } }),
       h('button', { class: 'ghost wide', html: 'Use a password instead', onclick: () => { st.step = 'password'; st.err = ''; redraw(); } }),
     );
   } else if (st.step === 'code') {
     const cooldownLeft = st.otpSentAt ? Math.max(0, 60 - Math.floor((Date.now() - st.otpSentAt) / 1000)) : 0;
-    const wantsCode = st.otpMode === 'code';
-    const verify = async () => {
-      const c = codeIn.value.trim();
-      if (!c) return;
-      busy(true);
-      try {
-        await sb.auth.verifyOtp(st.email, c);
-        track('signin_method', { method: 'otp', outcome: 'success' });
-        nav.state.acct = null;
-        nav.toast('Signed in');
-        nav.go('home');
-      } catch (e) {
-        track('signin_method', { method: 'otp', outcome: 'error', reason: String((e && e.status) || 'error') });
-        fail(e);
-      }
-    };
     const resend = async () => {
       busy(true);
       try {
@@ -1908,27 +1881,12 @@ function paintAccount(root, sb, au, boot, ent, up) {
       }
     };
     if (cooldownLeft > 0) st._cooldownTimer = setTimeout(redraw, 1000);
-    codeIn.addEventListener('keydown', (e) => e.key === 'Enter' && verify());
-    // Same email either way (it carries both a link and a code) — which one's
-    // front-and-center just matches what the visitor actually asked for.
     nodes.push(
       h('div', { class: 'card' },
         h('div', { class: 'pname sm', html: fx.icon('check') + 'Check your email' }),
         h('p', { class: 'muted small' },
-          wantsCode
-            ? `Sent to ${escapeAttr(st.email)}. Enter the 6-digit code below.`
-            : `Sent to ${escapeAttr(st.email)}. Open it on this device and tap the sign-in link — you’ll come straight back here, signed in.`),
+          `Sent to ${escapeAttr(st.email)}. Open it on this device and tap the sign-in link — you’ll come straight back here, signed in.`),
       ),
-      wantsCode
-        ? h('div', {},
-            codeIn,
-            h('button', { class: 'primary wide', disabled: st.busy ? 'true' : null, html: st.busy ? 'Checking…' : 'Verify code', onclick: verify }),
-          )
-        : h('details', { class: 'code-fallback' },
-            h('summary', {}, 'Got a code instead of a link?'),
-            codeIn,
-            h('button', { class: 'primary wide', disabled: st.busy ? 'true' : null, html: st.busy ? 'Checking…' : 'Verify code', onclick: verify }),
-          ),
       h('button', {
         class: 'ghost wide',
         disabled: st.busy || cooldownLeft > 0 ? 'true' : null,
