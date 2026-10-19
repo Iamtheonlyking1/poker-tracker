@@ -1,0 +1,36 @@
+# Keeps the Supabase free-tier project from pausing after 7 idle days by doing
+# a real database write (via the keepalive_ping() function, migration 0012)
+# every 12 hours. Uses only the public anon key — same one shipped in the
+# site's own JS — so there are no secrets to manage. If the ping ever fails
+# the job fails, and GitHub emails the repo owner: a silent failure here
+# would mean the project quietly pauses and takes the whole app down.
+#
+# Note: GitHub disables scheduled workflows on a public repo after 60 days
+# with no repo activity at all — any commit re-arms it.
+name: Supabase keep-alive
+
+on:
+  schedule:
+    - cron: '17 */12 * * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_URL: https://dmwsruvedmtepkdseiov.supabase.co
+      SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRtd3NydXZlZG10ZXBrZHNlaW92Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgxNDQzMDgsImV4cCI6MjEwMzcyMDMwOH0.X3lsW5EXjpOnRkGwTuSPK5EBrW8czNrRDkqcD8qHhno
+    steps:
+      - name: Call keepalive_ping()
+        run: |
+          code=$(curl -s -o out.txt -w '%{http_code}' -X POST "$SUPABASE_URL/rest/v1/rpc/keepalive_ping" \
+            -H "apikey: $SUPABASE_ANON_KEY" \
+            -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+            -H "Content-Type: application/json" \
+            -d '{}')
+          echo "status: $code"
+          cat out.txt
+          if [ "$code" != "200" ] && [ "$code" != "204" ]; then
+            echo "keep-alive ping failed" >&2
+            exit 1
+          fi
