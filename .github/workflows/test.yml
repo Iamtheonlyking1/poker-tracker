@@ -1,0 +1,24 @@
+# Runs the full test suite (plus the ad-hoc-id lint) on every push and every
+# pull request, so a broken change shows up as a red X on GitHub instead of
+# going unnoticed. NOTE: pushing to main still deploys straight to GitHub
+# Pages — this check reports a failure, it can't stop that deploy. The safe
+# habit is: work on a branch, open a PR, merge only when this is green.
+#
+# No dependencies to install (the project is zero-dep), so no npm ci step.
+name: Tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: npm test
+        run: npm test
